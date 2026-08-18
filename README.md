@@ -38,8 +38,8 @@ Desenvolver um protótipo com ESP32 capaz de detectar o estado de abertura (aber
 | :--- | :--- | :--- |
 | Criar repositório no GitHub | Miguel Dufloth | Feito |
 | Preencher README inicial | [NA] | A fazer |
-| Testar ESP32 com LED e Buzzer | [NA] | A fazer |
-| Validar a leitura do Reed Switch / Botão no Monitor Serial | [NA] | A fazer |
+| Testar ESP32 com LED e Buzzer | Gustavo | A fazer |
+| Validar a leitura do Reed Switch / Botão no Monitor Serial | Gustavo | A fazer |
 | Configurar conexão Wi-Fi e publicação/subscrição MQTT | [NA] | A fazer |
 | Desenhar diagrama de circuito e arquitetura inicial | [NA] | A fazer |
 | Registrar e investigar o primeiro risco técnico | Lucas | A fazer |
