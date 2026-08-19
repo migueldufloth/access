@@ -41,7 +41,7 @@ Desenvolver um protótipo com ESP32 capaz de detectar o estado de abertura (aber
 | Testar ESP32 com LED e Buzzer | Gustavo | A fazer |
 | Validar a leitura do Reed Switch / Botão no Monitor Serial | [NA] | A fazer |
 | Configurar conexão Wi-Fi e publicação/subscrição MQTT | [NA] | A fazer |
-| Desenhar diagrama de circuito e arquitetura inicial | [NA] | A fazer |
+| Desenhar diagrama de circuito e arquitetura inicial | Adrian | A fazer |
 | Registrar e investigar o primeiro risco técnico | Lucas | A fazer |
 
 ## Primeiro Risco Técnico
