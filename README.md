@@ -50,8 +50,6 @@ Fluxo de Alerta Local (Autonomia / Segurança Offline):
 
 ## Protótipo do Circuito
 
-![Esquema do Circuito]
-
 <img width="1138" height="501" alt="image" src="https://github.com/user-attachments/assets/2561c95c-0847-4903-b416-a3a165107052" />
 
 Simulador: https://wokwi.com/projects/473279281421060097
