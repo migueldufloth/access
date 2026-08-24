@@ -37,16 +37,22 @@ Desenvolver um protótipo com ESP32 capaz de detectar o estado de abertura (aber
   - Entrada primária de 5V DC via conector micro-USB (fonte externa/computador).
 - **Comunicação:** Protocolo MQTT encapsulado em rede Wi-Fi padrão 2.4 GHz.
 
-## Arquitetura 
+## Arquitetura do Sistema e Comunicação MQTT
 
-Fluxo de Telemetria e Detecção (Entrada ➔ Nuvem):
-`[Sensores (Botão / PIR)]` ➔ `[ESP32 (Leitura GPIO / Lógica Local)]` ➔ `[Rede Wi-Fi]` ➔ `[Broker MQTT (Publicação de Status)]` ➔ `[Dashboard / Painel do Usuário]`
+### 1. Fluxo de Telemetria e Detecção (Dispositivo ➔ Nuvem)
+`[Sensor PIR / Botão]` ➔ `[ESP32 (Processamento Local)]` ➔ `[Wi-Fi]` ➔ `[Broker MQTT]` ➔ **Tópico:** `access/grupo5/status` ➔ `[Dashboard / Painel]`
+* **Payload Publicado (JSON):** `{"armado": true, "disparado": false}`
 
-Fluxo de Comando Remoto e Controle (Nuvem ➔ Ação):
-`Painel / Cliente MQTT]` ➔ `[Broker MQTT (Tópico de Comando)]` ➔ `[ESP32 (Subscrição / Callback)]` ➔ `[Alteração de Estado (Armar / Desarmar)]`
+---
 
-Fluxo de Alerta Local (Autonomia / Segurança Offline):
-`[Evento de Abertura / Intrusão]` ➔ `[ESP32 (Processamento Local)]` ➔ `[Atuadores / Alertas Locais (Buzzer Sonoro / LED de Status)]`
+### 2. Fluxo de Controle Remoto (Nuvem ➔ Dispositivo)
+`[Painel / Cliente MQTT]` ➔ `[Broker MQTT]` ➔ **Tópico:** `access/grupo5/comando` ➔ `[ESP32 (Subscrição / Callback)]` ➔ `[Alterar Estado: Ativado / Desativado]`
+* **Payloads Aceitos:** `"Ativado"` ou `"Desativado"`
+
+---
+
+### 3. Fluxo de Alerta Local (Autonomia Offline)
+`[Evento de Intrusão (PIR = HIGH)]` ➔ `[Lógica Local ESP32]` ➔ `[Atuadores Locais: Buzzer 1.2kHz (GPIO 23) + LED Status (GPIO 4)]`
 
 ## Protótipo do Circuito
 
