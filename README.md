@@ -25,8 +25,8 @@ Desenvolver um protótipo com ESP32 capaz de detectar presença/abertura via sen
 ## Especificação de Hardware
 - **Microcontrolador:** Placa de desenvolvimento ESP32 Kit V1 ESP-WROOM-32, Dual-Core 240 MHz, Wi-Fi 802.11 b/g/n e Bluetooth BLE integrados.
 - **Sensores:**
-  - **Sensor de Presença:** Sensor Piroelétrico PIR modelo HC-SR501.
-  - **Sensor/Controle Manual:** Botão Pushbutton táctil 4 terminais 6x6x5 mm.
+  - **Sensor de Presença:** Sensor Magnético Mc-38-na.
+  - **Controle Manual para Ligar/Desligar Sistema:** Botão Pushbutton táctil 4 terminais 6x6x5 mm.
 - **Atuadores e Alertas:**
   - **Alerta Sonoro:** Buzzer Piezoelétrico 5V (geração de frequências e tons sonoros de alarme via PWM, ~1.2kHz).
   - **Alerta Visual:** LED Difuso Vermelho (indicação visual de status: aceso para Ativado/Desativado).
