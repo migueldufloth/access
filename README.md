@@ -1,7 +1,5 @@
 # Projeto IoT - Access (Grupo 5)
 
-> Visão geral e estado atual do projeto. Para o documento formal entregue na Aula 04 (decisões congeladas naquele momento), ver [`docs/aprofundamento-aula04.md`](docs/aprofundamento-aula04.md).
-
 ## Integrantes
 - Lucas Honorato dos Santos
 - Miguel Angel Huertas
@@ -67,17 +65,6 @@ Desenvolver um protótipo com ESP32 capaz de detectar presença/abertura via sen
 <img width="1138" height="501" alt="image" src="https://github.com/user-attachments/assets/2561c95c-0847-4903-b416-a3a165107052" />
 
 Simulador: https://wokwi.com/projects/473279281421060097
-
-## Backlog
-
-| Fase | Responsável(is) | Status |
-| :--- | :--- | :--- |
-| Montagem do circuito (ESP32 + PIR + botão + buzzer + LED) | Adrian | Feito |
-| Conexão Wi-Fi e comunicação MQTT (telemetria, comando, confirmação, reconexão) | Gustavo, Leonardo Lotério, Miguel Angel Huertas | A fazer |
-| Testes de alarme local e reconexão | Lucas | A fazer |
-| Documentação técnica e demonstração final | Miguel Dufloth, Todos | A fazer |
-
-> Backlog detalhado, tarefa a tarefa, na entrega da Aula 04: [`docs/aprofundamento-aula04.md`](docs/aprofundamento-aula04.md).
 
 ## Primeiro Risco Técnico
 - **Risco:** Perda de conexão Wi-Fi/Broker MQTT durante um evento de intrusão/abertura de porta, impedindo a notificação remota do alarme.

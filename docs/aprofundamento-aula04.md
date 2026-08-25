@@ -7,7 +7,7 @@
   - `/firmware` — código-fonte do ESP32 (a ser preenchido a partir da Aula 05)
   - `/hardware` — esquemáticos, datasheets e especificação de componentes
   - `/docs` — documentação do projeto (este documento)
-  - `README.md` — visão geral do projeto (Aula 02)
+  - `README.md` — visão geral do projeto
 
 ## Sensor e Atuador Reais
 - **Sensor principal:** Sensor Piroelétrico PIR **HC-SR501** — detecção de presença/movimento por infravermelho, saída digital (HIGH/LOW).
