@@ -66,6 +66,34 @@ Desenvolver um protótipo com ESP32 capaz de detectar presença/abertura via sen
 
 Simulador: https://wokwi.com/projects/473279281421060097
 
+## Instruções de Execução
+- **IDE:** Arduino IDE ou PlatformIO, com suporte à placa ESP32 (ESP-WROOM-32 / "ESP32 Dev Module").
+- **Bibliotecas:** `WiFi.h` (built-in) e `PubSubClient` (cliente MQTT) — a confirmar no `/firmware` assim que o código for versionado.
+- **Pinagem:**
+  | Componente | Pino |
+  | :--- | :--- |
+  | Buzzer | GPIO 23 |
+  | LED de status | GPIO 4 |
+  | Sensor PIR | a definir |
+  | Botão | a definir |
+- **Como rodar:** gravar o firmware em `/firmware` via IDE, abrir o Monitor Serial (115200 baud) para acompanhar logs de leitura, conexão Wi-Fi e MQTT.
+- **Validação da leitura:** o firmware deve descartar/ignorar leituras implausíveis do sensor antes de publicar telemetria (ver backlog).
+
+## Backlog Inicial
+
+| Tarefa | Responsável | Status |
+| :--- | :--- | :--- |
+| Criar repositório no GitHub | Miguel Dufloth | Feito |
+| Montar circuito (ESP32 + PIR + botão + buzzer + LED) | Adrian | Feito |
+| Conectar Wi-Fi e comunicação MQTT (telemetria, comando, confirmação, reconexão) | Gustavo, Leonardo Lotério, Miguel Angel Huertas | A fazer |
+| Testes de alarme local e reconexão | Lucas | A fazer |
+| Documentação técnica e demonstração final | Miguel Dufloth, Todos | A fazer |
+
+> Backlog detalhado, tarefa a tarefa, na entrega da Aula 04: [`docs/aprofundamento-aula04.md`](docs/aprofundamento-aula04.md).
+
 ## Primeiro Risco Técnico
 - **Risco:** Perda de conexão Wi-Fi/Broker MQTT durante um evento de intrusão/abertura de porta, impedindo a notificação remota do alarme.
 - **Mitigação/Investigação:** Implementar rotinas de reconexão automática no firmware do ESP32 e garantir que o alarme sonoro/visual local continue operando de forma autônoma (lógica offline), registrando o evento assim que a conexão for reestabelecida.
+
+## Dúvidas para o Professor
+Nenhuma pendente no momento.

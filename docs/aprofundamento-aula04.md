@@ -63,6 +63,7 @@ Este projeto não possui aplicativo/painel próprio (a interface é um dashboard
 | Montar circuito funcional em protoboard (ESP32 + PIR + botão + buzzer + LED) | Adrian | Feito |
 | Acionar buzzer (PWM 1.2kHz) e LED conforme estado local | Lucas | A fazer |
 | Conectar ESP32 ao Wi-Fi com rotina de reconexão automática | Gustavo | A fazer |
+| Validar leitura do sensor (descartar leituras implausíveis antes de publicar) | Miguel Angel Huertas | A fazer |
 | Publicar telemetria no tópico `access/grupo5/sensor/presenca` | Miguel Angel Huertas | A fazer |
 | Subscrever e tratar comandos no tópico `access/grupo5/comando/alarme` | Leonardo Lotério | A fazer |
 | Publicar confirmação de execução no tópico `access/grupo5/status/confirmacao` | Leonardo Lotério | A fazer |
