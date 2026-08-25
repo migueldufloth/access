@@ -87,7 +87,8 @@ Simulador: https://wokwi.com/projects/473279281421060097
 | Montar circuito (ESP32 + PIR + botão + buzzer + LED) | Adrian | Feito |
 | Conectar Wi-Fi e comunicação MQTT (telemetria, comando, confirmação, reconexão) | Gustavo, Leonardo Lotério, Miguel Angel Huertas | A fazer |
 | Testes de alarme local e reconexão | Lucas | A fazer |
-| Documentação técnica e demonstração final | Miguel Dufloth, Todos | A fazer |
+| Documentação técnica do firmware | Miguel Dufloth | A fazer |
+| Demonstração funcional final | Todos | A fazer |
 
 > Backlog detalhado, tarefa a tarefa, na entrega da Aula 04: [`docs/aprofundamento-aula04.md`](docs/aprofundamento-aula04.md).
 
