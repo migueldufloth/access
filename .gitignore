@@ -1,0 +1,14 @@
+# Build / toolchain
+.pio/
+build/
+*.o
+*.elf
+*.bin
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# SO
+.DS_Store
+Thumbs.db
