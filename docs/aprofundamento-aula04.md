@@ -58,15 +58,15 @@ Este projeto não possui aplicativo/painel próprio (a interface é um dashboard
 
 | Tarefa | Responsável | Status |
 | :--- | :--- | :--- |
-| Ler PIR HC-SR501 no Monitor Serial (HIGH/LOW) | Gustavo | A fazer |
-| Ler estado do botão (armar/desarmar) com debounce | Gustavo | A fazer |
-| Montar circuito funcional em protoboard (ESP32 + PIR + botão + buzzer + LED) | Adrian | A fazer |
+| Ler PIR HC-SR501 no Monitor Serial (HIGH/LOW) | Adrian | Feito |
+| Ler estado do botão (armar/desarmar) com debounce | Adrian | Feito |
+| Montar circuito funcional em protoboard (ESP32 + PIR + botão + buzzer + LED) | Adrian | Feito |
 | Acionar buzzer (PWM 1.2kHz) e LED conforme estado local | Lucas | A fazer |
-| Conectar ESP32 ao Wi-Fi com rotina de reconexão automática | Miguel Dufloth | A fazer |
+| Conectar ESP32 ao Wi-Fi com rotina de reconexão automática | Gustavo | A fazer |
 | Publicar telemetria no tópico `access/grupo5/sensor/presenca` | Miguel Angel Huertas | A fazer |
 | Subscrever e tratar comandos no tópico `access/grupo5/comando/alarme` | Leonardo Lotério | A fazer |
 | Publicar confirmação de execução no tópico `access/grupo5/status/confirmacao` | Leonardo Lotério | A fazer |
-| Implementar buffer/registro local de eventos durante perda de conexão | Miguel Dufloth | A fazer |
+| Implementar buffer/registro local de eventos durante perda de conexão | Gustavo | A fazer |
 | Testar reconexão automática (desligar/religar Wi-Fi durante disparo) | Lucas | A fazer |
 | Escrever documentação técnica do firmware (`/firmware/README.md`) | Miguel Dufloth | A fazer |
 | Gravar demonstração funcional do protótipo (vídeo/apresentação) | Todos | A fazer |
