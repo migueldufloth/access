@@ -12,3 +12,5 @@ build/
 # SO
 .DS_Store
 Thumbs.db
+secrets.h
+**/secrets.h
