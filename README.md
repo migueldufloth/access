@@ -1,16 +1,20 @@
-# Projeto IoT - Access (Grupo 5)
+# Projeto IoT - Access (Equipe 05 — Controle de Acesso)
 
 ## Integrantes
 - Lucas Honorato dos Santos
-- Miguel Angel Huertas
-- Miguel Dufloth
+- Miguel Angel Balladares Huertas
+- Miguel Angelo Dufloth Filho
 - Gustavo Franz
-- Leonardo Lotério
-- Adrian Roth
+- Leonardo Lotério de Lima
+- Adrian Marcio Roth
 
 ## Família Temática
-- **Projeto Médio (N1):** Abertura e Presença
-- **Projeto Avançado (N2/N3):** Controle de Acesso
+Tema da equipe: **Controle de Acesso**. A N1 e a N2/N3 são estágios de escopo crescente
+dentro desse mesmo tema, não temas diferentes:
+- **N1 (degrau mínimo viável):** Abertura e Presença — detecção de abertura de porta, alerta
+  local e notificação remota.
+- **N2/N3 (escopo completo):** Controle de Acesso — evolução do mesmo protótipo para o
+  controle de acesso completo.
 
 ## Problema
 A ausência de monitoramento automatizado e em tempo real sobre a abertura de portas, janelas ou compartimentos restritos dificulta a detecção rápida de acessos não autorizados ou intrusões, aumentando o risco de segurança em ambientes residenciais ou corporativos.
@@ -81,9 +85,26 @@ Desenvolver um protótipo com ESP32 capaz de detectar abertura de porta via sens
 
 ## Protótipo do Circuito
 
+### Versão 1 — concepção inicial
+
 <img width="1138" height="501" alt="image" src="https://github.com/user-attachments/assets/2561c95c-0847-4903-b416-a3a165107052" />
 
 Simulador: https://wokwi.com/projects/473279281421060097
+
+> **Este é o desenho da concepção inicial e não reflete a montagem atual.** O circuito
+> divergiu nos seguintes pontos:
+> - Sensor de presença PIR HC-SR501 substituído pelo sensor magnético de contato MC-38-NA,
+>   porque o evento de interesse é abertura de porta, e não presença no ambiente.
+> - Display OLED I2C SSD1306 128x64 acrescentado como dashboard local (SDA no GPIO 21, SCL
+>   no GPIO 22).
+> - Buzzer remanejado para o GPIO 25, com o GPIO 18 mantido em `LOW` como terra virtual.
+> - LED de status e botão de armar/desarmar ainda não implementados.
+
+### Versão 2 — implementação atual
+
+Pinagem atual documentada na seção [Instruções de Execução](#instruções-de-execução).
+
+> Diagrama a produzir — novo projeto no Wokwi ainda não criado para esta versão.
 
 ## Instruções de Execução
 - **IDE:** Arduino IDE ou PlatformIO, com suporte à placa ESP32 (ESP-WROOM-32 / "ESP32 Dev Module").
