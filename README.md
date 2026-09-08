@@ -26,7 +26,7 @@ A ausência de monitoramento automatizado e em tempo real sobre a abertura de po
 ## Objetivo da N1
 Desenvolver um protótipo com ESP32 capaz de detectar abertura de porta via sensor magnético e botão, operar em modos armado/desarmado, emitir um alerta/alarme local (buzzer, display e LED), publicar telemetria via MQTT com Wi-Fi e permitir o acionamento de comandos remotos de controle de estado com confirmação de ação.
 
-> **Nota:** o sensor de presença PIR HC-SR501, previsto na concepção inicial, foi substituído pelo sensor magnético de contato MC-38. O problema definido é abertura de porta, e presença no ambiente não é o mesmo evento: o PIR dispararia com qualquer movimento na sala e ficaria em silêncio se a porta fosse aberta fora do seu campo de visão.
+> **Nota:** o protótipo evoluiu da Versão 1 (sensor PIR HC-SR501, botão, buzzer e LED — efetivamente montada e testada) para o hardware atual, por duas razões. Primeiro, um integrante da equipe adquiriu um kit com ESP32, display OLED e sensor magnético de contato, tornando esses componentes disponíveis para o projeto. Segundo, o sensor magnético MC-38 responde diretamente ao evento do problema definido — abertura de porta —, enquanto o PIR captava presença no ambiente: dispararia com qualquer movimento na sala e ficaria em silêncio se a porta fosse aberta fora do seu campo de visão. O display OLED, por sua vez, permitiu um dashboard local que a Versão 1 não tinha.
 
 ## Especificação de Hardware
 - **Microcontrolador:** Placa de desenvolvimento ESP32 Kit V1 ESP-WROOM-32, Dual-Core 240 MHz, Wi-Fi 802.11 b/g/n e Bluetooth BLE integrados.
@@ -42,7 +42,7 @@ Desenvolver um protótipo com ESP32 capaz de detectar abertura de porta via sens
   - **Conexões e Prototipagem:** Mini Protoboard e conjunto de cabos jumpers (Macho-Macho / Macho-Fêmea).
 - **Alimentação:**
   - Entrada primária de 5V DC via conector micro-USB (fonte externa/computador).
-- **Comunicação:** Protocolo MQTT encapsulado em rede Wi-Fi padrão 2.4 GHz.
+- **Comunicação (previsto, ainda não implementado):** Protocolo MQTT encapsulado em rede Wi-Fi padrão 2.4 GHz. A notificação remota atual sai por HTTP (ver [Status Atual da Implementação](#status-atual-da-implementação)).
 
 ## Estrutura do Repositório
 - `/firmware/Access` — código-fonte do ESP32 (sketch da Arduino IDE)
@@ -91,14 +91,20 @@ Desenvolver um protótipo com ESP32 capaz de detectar abertura de porta via sens
 
 Simulador: https://wokwi.com/projects/473279281421060097
 
-> **Este é o desenho da concepção inicial e não reflete a montagem atual.** O circuito
-> divergiu nos seguintes pontos:
-> - Sensor de presença PIR HC-SR501 substituído pelo sensor magnético de contato MC-38-NA,
->   porque o evento de interesse é abertura de porta, e não presença no ambiente.
-> - Display OLED I2C SSD1306 128x64 acrescentado como dashboard local (SDA no GPIO 21, SCL
->   no GPIO 22).
-> - Buzzer remanejado para o GPIO 25, com o GPIO 18 mantido em `LOW` como terra virtual.
-> - LED de status e botão de armar/desarmar ainda não implementados.
+> **Este circuito foi efetivamente montado e testado:** o sensor PIR, o botão e o LED de
+> status funcionaram nessa montagem. O desenho e o link acima são o registro dessa concepção
+> inicial e não refletem a montagem atual.
+
+**Evolução para a Versão 2** (não uma correção — a Versão 1 funcionou como planejada):
+- Um integrante da equipe adquiriu um kit com ESP32, display OLED e sensor magnético de
+  contato (MC-38-NA), tornando esses componentes disponíveis para o projeto.
+- A equipe migrou para esse conjunto porque o MC-38 responde diretamente ao evento do
+  problema definido — abertura de porta —, enquanto o PIR captava presença no ambiente
+  (dispararia com qualquer movimento na sala e ficaria em silêncio se a porta fosse aberta
+  fora do seu campo de visão); e porque o display OLED permitiu um dashboard local que a
+  Versão 1 não tinha.
+- Buzzer remanejado para o GPIO 25, com o GPIO 18 mantido em `LOW` como terra virtual.
+- LED de status e botão de armar/desarmar ainda não foram reintegrados na Versão 2.
 
 ### Versão 2 — implementação atual
 
@@ -123,19 +129,47 @@ Pinagem atual documentada na seção [Instruções de Execução](#instruções-
 - **Como rodar:** abrir `firmware/Access/Access.ino` na IDE, criar o `secrets.h`, selecionar a placa "ESP32 Dev Module", gravar e abrir o Monitor Serial (115200 baud) para acompanhar logs de leitura e de conexão Wi-Fi.
 - **Validação da leitura:** o firmware deve descartar/ignorar leituras implausíveis do sensor antes de publicar telemetria (ver backlog).
 
-## Backlog Inicial
+## Backlog
 
-| Tarefa | Responsável | Status |
-| :--- | :--- | :--- |
-| Criar repositório no GitHub | Miguel Dufloth | Feito |
-| Montar circuito (ESP32 + MC-38 + buzzer + OLED) | Adrian | Feito |
-| Conectar Wi-Fi com reconexão automática | Gustavo, Leonardo Lotério, Miguel Angel Huertas | Feito |
-| Comunicação MQTT (telemetria, comando, confirmação) | Gustavo, Leonardo Lotério, Miguel Angel Huertas | A fazer |
-| Testes de alarme local e reconexão | Lucas | Feito |
-| Documentação técnica do firmware | Miguel Dufloth | A fazer |
-| Demonstração funcional final | Todos | A fazer |
+A coluna **Versão** identifica em qual hardware a tarefa foi feita ou será feita. Uma linha
+`v1` marcada como Feito descreve o circuito da concepção inicial, não uma funcionalidade
+presente no firmware atual — só linhas `v2` correspondem ao que está em
+`firmware/Access/Access.ino` hoje.
 
-> Backlog detalhado, tarefa a tarefa, na entrega da Aula 04: [`docs/aprofundamento-aula04.md`](docs/aprofundamento-aula04.md).
+### Versão 1 (concluída)
+
+| Tarefa | Versão | Responsável | Prazo | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| Montar circuito com PIR, botão, buzzer e LED | v1 | Adrian Marcio Roth | — | Feito |
+| Ler PIR e estado do botão com debounce no Monitor Serial | v1 | Adrian Marcio Roth | — | Feito |
+
+### Versão 2 (em andamento)
+
+| Tarefa | Versão | Responsável | Prazo | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| Migrar para o kit com ESP32, OLED e sensor magnético | v2 | Lucas Honorato | — | Feito |
+| Ler o MC-38 com detecção de borda | v2 | Adrian Marcio Roth | — | Feito |
+| Buzzer com padrões distintos para abertura e fechamento | v2 | Lucas Honorato | — | Feito |
+| Dashboard local no OLED (estado, contador, tempo, status de rede) | v2 | Miguel Angelo Dufloth | — | Feito |
+| Wi-Fi com log de IP por DHCP e RSSI | v2 | Gustavo Franz | — | Feito |
+| Reconexão automática não bloqueante, verificação a cada 5s | v2 | Gustavo Franz | — | Feito |
+| Testar reconexão com queda provocada (evidência do CP06) | v2 | Lucas Honorato | — | Feito |
+| Reintegrar botão de armar/desarmar na v2 | v2 | Adrian Marcio Roth | 15/09 | A fazer |
+| Reintegrar LED vermelho de status na v2 | v2 | Adrian Marcio Roth | 15/09 | A fazer |
+| Cliente MQTT (PubSubClient) e conexão ao broker | v2 | Gustavo Franz | 15/09 | A fazer |
+| Publicar telemetria em `access/grupo5/sensor/presenca` | v2 | Miguel Angel Balladares | 15/09 | A fazer |
+| Subscrever e tratar comandos em `access/grupo5/comando/alarme` | v2 | Leonardo Lotério | 15/09 | A fazer |
+| Publicar confirmação em `access/grupo5/status/confirmacao` | v2 | Leonardo Lotério | 15/09 | A fazer |
+| Mover a decisão de disparo do alarme para fora do `loop()`, passando pela mensageria | v2 | Gustavo Franz | 15/09 | A fazer |
+| Reconexão do broker MQTT, separada da reconexão do Wi-Fi | v2 | Gustavo Franz | 15/09 | A fazer |
+| Validar leitura do sensor antes de publicar | v2 | Miguel Angel Balladares | 15/09 | A fazer |
+| Diagrama do circuito v2 e novo projeto no Wokwi | v2 | Adrian Marcio Roth | 15/09 | A fazer |
+| Documentação técnica do firmware (`firmware/README.md`) | v2 | Miguel Angelo Dufloth | 20/09 | A fazer |
+| Ensaio da demonstração e da validação individual | v2 | Todos | 20/09 | A fazer |
+
+> [`docs/aprofundamento-aula04.md`](docs/aprofundamento-aula04.md) registra o planejamento e
+> os status da Versão 1 no momento da Aula 04 — é um registro histórico, não atualizado desde
+> então. O backlog vigente do projeto é o desta seção.
 
 ## Primeiro Risco Técnico
 - **Risco:** Perda de conexão Wi-Fi/Broker MQTT durante um evento de intrusão/abertura de porta, impedindo a notificação remota do alarme.
