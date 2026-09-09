@@ -4,6 +4,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include "secrets.h"
+#include "config.h"
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -16,11 +17,6 @@ const char* ssid      = WIFI_SSID;
 const char* password  = WIFI_PASS;
 const char* ntfyTopic = NTFY_TOPIC;
 
-// --- PINOS ---
-const int REED_PIN   = 4;   // Sensor magnético MC-38
-const int BUZZER_POS = 25;  // Buzzer Positivo (+)
-const int BUZZER_GND = 18;  // Buzzer Negativo (-) -> GND Virtual
-
 // --- VARIÁVEIS DE ESTADO ---
 int contadorAberturas = 0;
 bool ultimoEstado = false;
@@ -30,7 +26,19 @@ bool tomAlarme = false;
 
 // --- CONTROLE DE RECONEXÃO WI-FI (NÃO-BLOQUEANTE) ---
 unsigned long ultimaChecagemWifi = 0;
-const unsigned long intervaloChecagemWifi = 5000; // Avalia a cada 5s
+const unsigned long intervaloChecagemWifi = INTERVALO_CHECAGEM_WIFI;
+
+// --- ESTADO DO ALARME (MQTT) ---
+// sistemaArmado: alterada apenas por comando remoto (Etapa 5).
+// alarmeDisparado: escrita exclusivamente pelo handler de eventos MQTT,
+// com a única exceção do modo degradado (Etapa 7). Nenhum outro trecho do
+// firmware deve atribuir valor a ela.
+bool sistemaArmado = false;
+bool alarmeDisparado = false;
+
+// --- ESTADO DA CONEXÃO COM O BROKER MQTT ---
+bool brokerConectado = false;
+unsigned long ultimoContatoBroker = 0; // usado pelo modo degradado (Etapa 7)
 
 void enviarNotificacao() {
   if (WiFi.status() == WL_CONNECTED) {
@@ -181,10 +189,10 @@ void setup() {
   pinMode(BUZZER_GND, OUTPUT);
   digitalWrite(BUZZER_GND, LOW);
 
-  Wire.begin(21, 22);
+  Wire.begin(OLED_SDA, OLED_SCL);
 
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    display.begin(SSD1306_SWITCHCAPVCC, 0x3D);
+  if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR_PRIMARIO)) {
+    display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR_ALTERNATIVO);
   }
 
   display.clearDisplay();
