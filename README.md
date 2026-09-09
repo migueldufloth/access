@@ -114,7 +114,7 @@ Pinagem atual documentada na seção [Instruções de Execução](#instruções-
 
 ## Instruções de Execução
 - **IDE:** Arduino IDE ou PlatformIO, com suporte à placa ESP32 (ESP-WROOM-32 / "ESP32 Dev Module").
-- **Bibliotecas:** `WiFi.h` e `HTTPClient.h` (built-in do core ESP32), `Wire.h`, `Adafruit_GFX` e `Adafruit_SSD1306`. `PubSubClient` entra quando o MQTT for implementado.
+- **Bibliotecas:** `WiFi.h` (built-in do core ESP32), `Wire.h`, `Adafruit_GFX` e `Adafruit_SSD1306`. O cliente MQTT (`mqtt_client.h`, do ESP-IDF) também vem no core ESP32 e não precisa de instalação. É preciso instalar manualmente a `ArduinoJson` (Benoît Blanchon) pelo Gerenciador de Bibliotecas da Arduino IDE.
 - **Pinagem (conforme `firmware/Access/Access.ino`):**
   | Componente | Pino |
   | :--- | :--- |
