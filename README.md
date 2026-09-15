@@ -48,6 +48,8 @@ Desenvolver um protótipo com ESP32 capaz de detectar abertura de porta via sens
 - `/firmware/Access` — código-fonte do ESP32 (sketch da Arduino IDE)
 - `/hardware` — esquemáticos, datasheets e especificação de componentes
 - `/docs` — documentação do projeto (entregas por aula)
+- `/broker` — config do broker MQTT (Mosquitto) e do proxy nginx que atendem
+  `access/grupo5/#` em produção (ver [broker/README.md](broker/README.md))
 
 ## Status Atual da Implementação
 

@@ -1,0 +1,11 @@
+# Dispositivo: publica telemetria e status, recebe comandos
+user access_esp32
+topic write access/grupo5/sensor/#
+topic write access/grupo5/status/#
+topic read  access/grupo5/comando/#
+
+# Dashboard: le telemetria e status, publica comandos
+user access_web
+topic read  access/grupo5/sensor/#
+topic read  access/grupo5/status/#
+topic write access/grupo5/comando/#
