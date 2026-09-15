@@ -69,6 +69,12 @@ Desenvolver um protótipo com ESP32 capaz de detectar abertura de porta via sens
 
 > **Esta seção descreve a arquitetura-alvo, ainda não implementada.** O firmware atual não possui cliente MQTT: a notificação de abertura sai por HTTP para o `ntfy.sh`. Os contratos de tópicos abaixo são o desenho a ser implementado.
 
+> **Conectividade:** o ESP32 não fica na mesma rede do broker, e o broker só expõe MQTT puro
+> (`1883`) para LAN/Tailscale — a internet só tem acesso à `443`. Por isso o firmware conecta via
+> **MQTT sobre WebSocket com TLS** (`wss://accessgrupo5.duckdns.org/mqtt`), usando o cliente
+> `esp_mqtt_client` do ESP-IDF em vez de `PubSubClient` puro. Detalhes e exemplo de código em
+> [broker/README.md](broker/README.md#conectividade-externa-esp32-em-rede-diferente-do-broker).
+
 ### 1. Fluxo de Telemetria e Detecção (Dispositivo ➔ Nuvem)
 `[Sensor Magnético / Botão]` ➔ `[ESP32 (Processamento Local)]` ➔ `[Wi-Fi]` ➔ `[Broker MQTT]` ➔ **Tópico:** `access/grupo5/sensor/presenca` ➔ `[Dashboard / Painel]`
 * **Payload Publicado (JSON):** `{"armado": true, "presenca": false, "disparado": false}`
@@ -116,7 +122,13 @@ Pinagem atual documentada na seção [Instruções de Execução](#instruções-
 
 ## Instruções de Execução
 - **IDE:** Arduino IDE ou PlatformIO, com suporte à placa ESP32 (ESP-WROOM-32 / "ESP32 Dev Module").
-- **Bibliotecas:** `WiFi.h` (built-in do core ESP32), `Wire.h`, `Adafruit_GFX` e `Adafruit_SSD1306`. O cliente MQTT (`mqtt_client.h`, do ESP-IDF) também vem no core ESP32 e não precisa de instalação. É preciso instalar manualmente a `ArduinoJson` (Benoît Blanchon) pelo Gerenciador de Bibliotecas da Arduino IDE.
+- **Bibliotecas:** `WiFi.h` e `HTTPClient.h` (built-in do core ESP32), `Wire.h`, `Adafruit_GFX` e
+  `Adafruit_SSD1306`. O cliente MQTT (`mqtt_client.h`/`esp_mqtt_client`, do ESP-IDF) também vem no
+  core Arduino-ESP32 e não precisa de instalação — é ele que entra no lugar do `PubSubClient`,
+  porque o broker só é alcançável de fora via `wss://`, que `PubSubClient` não suporta (ver
+  [Arquitetura do Sistema e Comunicação MQTT](#arquitetura-do-sistema-e-comunicação-mqtt)). É
+  preciso instalar manualmente a `ArduinoJson` (Benoît Blanchon) pelo Gerenciador de Bibliotecas
+  da Arduino IDE.
 - **Pinagem (conforme `firmware/Access/Access.ino`):**
   | Componente | Pino |
   | :--- | :--- |
@@ -158,7 +170,7 @@ presente no firmware atual — só linhas `v2` correspondem ao que está em
 | Testar reconexão com queda provocada (evidência do CP06) | v2 | Lucas Honorato | — | Feito |
 | Reintegrar botão de armar/desarmar na v2 | v2 | Adrian Marcio Roth | 15/09 | A fazer |
 | Reintegrar LED vermelho de status na v2 | v2 | Adrian Marcio Roth | 15/09 | A fazer |
-| Cliente MQTT (PubSubClient) e conexão ao broker | v2 | Gustavo Franz | 15/09 | A fazer |
+| Cliente MQTT (`esp_mqtt_client` via `wss://`, não `PubSubClient`) e conexão ao broker | v2 | Gustavo Franz | 15/09 | A fazer |
 | Publicar telemetria em `access/grupo5/sensor/presenca` | v2 | Miguel Angel Balladares | 15/09 | A fazer |
 | Subscrever e tratar comandos em `access/grupo5/comando/alarme` | v2 | Leonardo Lotério | 15/09 | A fazer |
 | Publicar confirmação em `access/grupo5/status/confirmacao` | v2 | Leonardo Lotério | 15/09 | A fazer |
