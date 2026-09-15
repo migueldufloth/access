@@ -23,17 +23,21 @@ unsigned long tempoUltimaMudanca = 0;
 unsigned long tempoUltimoAlarme = 0;
 bool tomAlarme = false;
 
-// sistemaArmado e alarmeDisparado só são escritas no tratamento de comando
-// MQTT (tratarComando, mais abaixo). Nenhum outro trecho do firmware deve
-// atribuir valor a elas.
+// sistemaArmado só é escrita no tratamento de comando MQTT (tratarComando).
+// alarmeDisparado também só é escrita ali, com uma única exceção: o modo
+// degradado (avaliarModoDegradado), quando o broker some por mais de
+// TIMEOUT_MODO_DEGRADADO e o firmware volta a decidir sozinho. Nenhum outro
+// trecho do firmware deve atribuir valor a essas duas variáveis.
 bool sistemaArmado = false;
 bool alarmeDisparado = false;
+bool modoDegradado = false;
 
 // --- CONTROLE MQTT (ESP-IDF) ---
 esp_mqtt_client_handle_t clienteMqtt;
 bool brokerConectado = false;
 unsigned long ultimoContatoBroker = 0;
 static unsigned long ultimaTelemetria = 0;
+static unsigned long ultimaAtualizacaoOled = 0;
 
 // --- CONTROLE DE WI-FI ---
 unsigned long ultimaChecagemWifi = 0;
@@ -124,6 +128,30 @@ void tratarComando(esp_mqtt_event_handle_t event) {
   }
 
   publicarConfirmacao(comando, aplicado);
+}
+
+// --- MODO DEGRADADO ---
+// Sem laço de reconexão manual do broker (o cliente ESP-IDF já reconecta
+// sozinho) — o que este trecho acompanha é a política de degradação: sem
+// contato há mais de TIMEOUT_MODO_DEGRADADO, o firmware para de esperar
+// comando remoto e volta a decidir o alarme pela leitura direta do sensor,
+// como na v2. É a única exceção à regra de que só tratarComando escreve em
+// alarmeDisparado.
+void avaliarModoDegradado(bool estadoAtual) {
+  bool semContatoBroker = (millis() - ultimoContatoBroker) > TIMEOUT_MODO_DEGRADADO;
+
+  if (semContatoBroker != modoDegradado) {
+    modoDegradado = semContatoBroker;
+    if (modoDegradado) {
+      Serial.println("\n[DEGRADADO] Sem contato com o broker ha mais de 30s - decidindo localmente.");
+    } else {
+      Serial.println("\n[DEGRADADO] Contato com o broker restabelecido - decisao volta a ser remota.");
+    }
+  }
+
+  if (modoDegradado) {
+    alarmeDisparado = estadoAtual;
+  }
 }
 
 // --- HANDLER DE EVENTOS MQTT ---
@@ -222,6 +250,8 @@ void atualizarDashboard(bool aberta) {
   display.setCursor(54, 2);
   if (WiFi.status() != WL_CONNECTED) {
     display.print("[NO WIFI]");
+  } else if (modoDegradado) {
+    display.print("[LOCAL]");
   } else if (!brokerConectado) {
     display.print("[NO MQTT]");
   } else {
@@ -316,6 +346,9 @@ void setup() {
 void loop() {
   verificarReconexaoWiFi();
 
+  bool estadoAtual = digitalRead(REED_PIN);
+  avaliarModoDegradado(estadoAtual);
+
   // 1. Telemetria periódica
   if (millis() - ultimaTelemetria > INTERVALO_TELEMETRIA) {
     ultimaTelemetria = millis();
@@ -323,14 +356,12 @@ void loop() {
   }
 
   // 2. Transições de estado do sensor
-  bool estadoAtual = digitalRead(REED_PIN);
-
   if (estadoAtual != ultimoEstado) {
-    if (estadoAtual == true) { 
+    if (estadoAtual == true) {
       contadorAberturas++;
       Serial.printf("\n[EVENTO] Porta Aberta! Total: %d\n", contadorAberturas);
       publicarTelemetria(true);
-    } else { 
+    } else {
       Serial.println("\n[EVENTO] Porta Fechada.");
       somPortaFechou();
       publicarTelemetria(false);
@@ -339,14 +370,17 @@ void loop() {
     tempoUltimaMudanca = millis();
   }
 
-  // 3. Sirene local
-  if (estadoAtual == true) {
+  // 3. Sirene: decisão vem da rede (alarmeDisparado), exceto em modo
+  // degradado, onde avaliarModoDegradado() já a alimenta pelo sensor direto.
+  if (alarmeDisparado) {
     processarAlarmePortaAberta();
   } else {
     noTone(BUZZER_POS);
   }
 
-  // 4. Renderização gráfica
-  atualizarDashboard(estadoAtual);
-  delay(30);
+  // 4. Renderização gráfica com cadência própria, sem bloquear o loop
+  if (millis() - ultimaAtualizacaoOled > INTERVALO_ATUALIZACAO_OLED) {
+    ultimaAtualizacaoOled = millis();
+    atualizarDashboard(estadoAtual);
+  }
 }
