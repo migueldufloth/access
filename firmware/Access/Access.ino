@@ -16,11 +16,6 @@
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-// --- PINOS ---
-const int REED_PIN   = 4;   // Sensor magnético MC-38
-const int BUZZER_POS = 25;  // Buzzer (+)
-const int BUZZER_GND = 18;  // Buzzer (-) -> GND Virtual
-
 // --- ESTADO DO SISTEMA ---
 int contadorAberturas = 0;
 bool ultimoEstado = false;
@@ -28,7 +23,9 @@ unsigned long tempoUltimaMudanca = 0;
 unsigned long tempoUltimoAlarme = 0;
 bool tomAlarme = false;
 
-// Flags de contrato (apenas leitura nesta etapa)
+// sistemaArmado e alarmeDisparado só são escritas no tratamento de comando
+// MQTT (tratarComando, mais abaixo). Nenhum outro trecho do firmware deve
+// atribuir valor a elas.
 bool sistemaArmado = false;
 bool alarmeDisparado = false;
 
@@ -40,7 +37,7 @@ static unsigned long ultimaTelemetria = 0;
 
 // --- CONTROLE DE WI-FI ---
 unsigned long ultimaChecagemWifi = 0;
-const unsigned long intervaloChecagemWifi = 5000;
+const unsigned long intervaloChecagemWifi = INTERVALO_CHECAGEM_WIFI;
 
 // --- SINCRONIZAÇÃO DE HORA (SNTP PARA TLS) ---
 void sincronizarHora() {
@@ -73,6 +70,62 @@ void publicarTelemetria(bool portaAberta) {
   Serial.printf("[MQTT Telemetria] %s\n", buffer);
 }
 
+// --- COMANDOS REMOTOS E CONFIRMAÇÃO ---
+static bool topicoRecebidoEh(esp_mqtt_event_handle_t event, const char* alvo) {
+  size_t tamanhoAlvo = strlen(alvo);
+  return event->topic_len == tamanhoAlvo && memcmp(event->topic, alvo, tamanhoAlvo) == 0;
+}
+
+// event->data chega sem terminador nulo: comparar sempre pelo data_len,
+// nunca tratar como C-string.
+static bool comandoRecebidoEh(esp_mqtt_event_handle_t event, const char* alvo) {
+  size_t tamanhoAlvo = strlen(alvo);
+  return event->data_len == tamanhoAlvo && memcmp(event->data, alvo, tamanhoAlvo) == 0;
+}
+
+void publicarConfirmacao(const char* comando, bool aplicado) {
+  StaticJsonDocument<160> doc;
+  doc["comando"]   = comando;
+  doc["aplicado"]  = aplicado;
+  doc["armado"]    = sistemaArmado;
+  doc["disparado"] = alarmeDisparado;
+
+  char buffer[160];
+  size_t tamanho = serializeJson(doc, buffer);
+  esp_mqtt_client_publish(clienteMqtt, TOPICO_STATUS_CONFIRMACAO, buffer, tamanho, 0, false);
+  ultimoContatoBroker = millis();
+  Serial.printf("[MQTT Confirmacao] %s\n", buffer);
+}
+
+void tratarComando(esp_mqtt_event_handle_t event) {
+  const char* comando = NULL;
+  bool aplicado = false;
+
+  if (comandoRecebidoEh(event, "armar")) {
+    comando = "armar";
+    sistemaArmado = true;
+    aplicado = true;
+  } else if (comandoRecebidoEh(event, "desarmar")) {
+    comando = "desarmar";
+    sistemaArmado = false;
+    alarmeDisparado = false;
+    aplicado = true;
+  } else if (comandoRecebidoEh(event, "disparar")) {
+    comando = "disparar";
+    aplicado = sistemaArmado; // recusa disparo remoto com sistema desarmado
+    if (aplicado) alarmeDisparado = true;
+  } else if (comandoRecebidoEh(event, "silenciar")) {
+    comando = "silenciar";
+    alarmeDisparado = false;
+    aplicado = true;
+  } else {
+    Serial.println("[MQTT] Comando desconhecido recebido, ignorado.");
+    return;
+  }
+
+  publicarConfirmacao(comando, aplicado);
+}
+
 // --- HANDLER DE EVENTOS MQTT ---
 static void mqttEventHandler(void* handlerArgs, esp_event_base_t base, int32_t eventId, void* eventData) {
   esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t) eventData;
@@ -83,12 +136,19 @@ static void mqttEventHandler(void* handlerArgs, esp_event_base_t base, int32_t e
       ultimoContatoBroker = millis();
       Serial.println("[MQTT] Conectado ao broker.");
       esp_mqtt_client_publish(clienteMqtt, TOPICO_STATUS_PRESENCA_DISPOSITIVO, "online", 0, 0, true);
+      esp_mqtt_client_subscribe(clienteMqtt, TOPICO_COMANDO_ALARME, 0);
       publicarTelemetria(digitalRead(REED_PIN));
       break;
 
     case MQTT_EVENT_DISCONNECTED:
       brokerConectado = false;
       Serial.println("[MQTT] Desconectado do broker.");
+      break;
+
+    case MQTT_EVENT_DATA:
+      if (topicoRecebidoEh(event, TOPICO_COMANDO_ALARME)) {
+        tratarComando(event);
+      }
       break;
 
     case MQTT_EVENT_ERROR:
@@ -233,9 +293,9 @@ void setup() {
   pinMode(BUZZER_GND, OUTPUT);
   digitalWrite(BUZZER_GND, LOW); // Terra virtual
 
-  Wire.begin(21, 22);
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    display.begin(SSD1306_SWITCHCAPVCC, 0x3D);
+  Wire.begin(OLED_SDA, OLED_SCL);
+  if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR_PRIMARIO)) {
+    display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR_ALTERNATIVO);
   }
 
   display.clearDisplay();
