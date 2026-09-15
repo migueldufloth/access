@@ -55,6 +55,18 @@
   .neutro  { color: #cccccc; }
   .offline { color: #666666; }
 
+  .faixa-alarme {
+    background: #e06c75;
+    color: #111111;
+    font-weight: bold;
+    text-align: center;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #e06c75;
+  }
+
+  .oculta { display: none; }
+
   .comandos { margin-top: 12px; }
 
   button {
@@ -85,6 +97,8 @@
 </head>
 <body>
 
+<div id="faixa-alarme" class="faixa-alarme oculta">ALARME DISPARADO</div>
+
 <h1>access/grupo5 :: estado</h1>
 <table>
   <tr><th>conexao (dashboard)</th><td id="status-conexao">conectando...</td></tr>
@@ -94,6 +108,7 @@
   <tr><th>disparado</th><td id="status-disparado">-</td></tr>
   <tr><th>aberturas</th><td id="status-aberturas">-</td></tr>
   <tr><th>rssi</th><td id="status-rssi">-</td></tr>
+  <tr><th>última telemetria</th><td id="status-ultima-telemetria">aguardando...</td></tr>
 </table>
 
 <h1>access/grupo5 :: comando</h1>
@@ -116,6 +131,11 @@
   var TOPICO_STATUS_CONFIRMACAO = "access/grupo5/status/confirmacao";
   var TOPICO_STATUS_PRESENCA_DISPOSITIVO = "access/grupo5/status/presenca_dispositivo";
   var TOPICO_STATUS_CORINGA = "access/grupo5/status/#";
+
+  // Mesmo limiar do modo degradado do firmware (config.h): acima disso, a
+  // telemetria na tela deixa de refletir o estado real do dispositivo.
+  var LIMITE_TELEMETRIA_OBSOLETA_MS = 30000;
+  var ultimaTelemetriaRecebidaEm = null;
 
   function log(linha) {
     var el = document.getElementById("log");
@@ -183,15 +203,38 @@
     definirTexto("status-aberturas", String(dados.aberturas));
     definirTexto("status-rssi", dados.rssi + " dBm");
 
+    document.getElementById("faixa-alarme").classList.toggle("oculta", !dados.disparado);
+
+    ultimaTelemetriaRecebidaEm = Date.now();
+    atualizarIdadeTelemetria();
+
     avaliarDisparoAutomatico(dados);
   }
+
+  // Mostra há quanto tempo a última telemetria chegou e marca como obsoleta
+  // quando passa do limiar — sem isso a tela mostra o último estado como se
+  // fosse atual mesmo com o ESP32 desligado.
+  function atualizarIdadeTelemetria() {
+    var el = document.getElementById("status-ultima-telemetria");
+    if (ultimaTelemetriaRecebidaEm === null) {
+      el.textContent = "aguardando...";
+      el.className = "neutro";
+      return;
+    }
+    var decorridoMs = Date.now() - ultimaTelemetriaRecebidaEm;
+    var obsoleta = decorridoMs > LIMITE_TELEMETRIA_OBSOLETA_MS;
+    el.textContent = Math.round(decorridoMs / 1000) + "s atrás" + (obsoleta ? " (obsoleta)" : "");
+    el.className = obsoleta ? "offline" : "ok";
+  }
+
+  setInterval(atualizarIdadeTelemetria, 1000);
 
   // Regra automática de disparo remoto: é o único lugar do painel que decide
   // acionar o alarme sozinho, sem clique manual. Fica isolada aqui de
   // propósito — é o trecho alterado ao vivo durante a validação individual.
   function avaliarDisparoAutomatico(dados) {
     if (dados.porta === "aberta" && dados.armado === true) {
-      publicarComando("disparar");
+      publicarComando("disparar", "auto");
     }
   }
 
@@ -210,22 +253,22 @@
     log("confirmacao: comando=" + dados.comando + " aplicado=" + dados.aplicado);
   }
 
-  function publicarComando(comando) {
+  function publicarComando(comando, origem) {
     client.publish(TOPICO_COMANDO_ALARME, comando);
-    log("comando publicado: " + comando);
+    log("[" + origem + "] comando publicado: " + comando);
   }
 
   document.getElementById("btn-armar").addEventListener("click", function () {
-    publicarComando("armar");
+    publicarComando("armar", "manual");
   });
   document.getElementById("btn-desarmar").addEventListener("click", function () {
-    publicarComando("desarmar");
+    publicarComando("desarmar", "manual");
   });
   document.getElementById("btn-disparar").addEventListener("click", function () {
-    publicarComando("disparar");
+    publicarComando("disparar", "manual");
   });
   document.getElementById("btn-silenciar").addEventListener("click", function () {
-    publicarComando("silenciar");
+    publicarComando("silenciar", "manual");
   });
 })();
 </script>
