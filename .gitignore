@@ -14,3 +14,4 @@ build/
 Thumbs.db
 secrets.h
 **/secrets.h
+broker/www/config.js

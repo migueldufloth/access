@@ -1,7 +1,233 @@
 <!doctype html>
 <html lang="pt-BR">
-<head><meta charset="utf-8"><title>Access dashboard</title></head>
+<head>
+<meta charset="utf-8">
+<title>access/grupo5 - telemetria</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script src="config.js"></script>
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    background: #111111;
+    color: #cccccc;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 14px;
+    line-height: 1.4;
+    margin: 0;
+    padding: 24px;
+  }
+
+  h1 {
+    font-size: 15px;
+    font-weight: normal;
+    color: #ffffff;
+    border-bottom: 1px solid #444444;
+    padding-bottom: 8px;
+    margin: 24px 0 12px 0;
+  }
+
+  h1:first-child { margin-top: 0; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    max-width: 480px;
+  }
+
+  th, td {
+    border: 1px solid #333333;
+    padding: 6px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    color: #888888;
+    font-weight: normal;
+    width: 40%;
+    white-space: nowrap;
+  }
+
+  .ok      { color: #7ec699; }
+  .alerta  { color: #e06c75; }
+  .neutro  { color: #cccccc; }
+  .offline { color: #666666; }
+
+  .comandos { margin-top: 12px; }
+
+  button {
+    background: #1c1c1c;
+    color: #cccccc;
+    border: 1px solid #555555;
+    font-family: inherit;
+    font-size: 14px;
+    padding: 8px 16px;
+    margin: 0 8px 8px 0;
+    cursor: pointer;
+  }
+
+  button:hover  { background: #2a2a2a; }
+  button:active { background: #333333; }
+
+  #log {
+    white-space: pre-wrap;
+    word-break: break-all;
+    border: 1px solid #333333;
+    padding: 8px;
+    height: 200px;
+    overflow-y: auto;
+    color: #888888;
+    font-size: 12px;
+  }
+</style>
+</head>
 <body>
-<p>Access dashboard - em construção</p>
+
+<h1>access/grupo5 :: estado</h1>
+<table>
+  <tr><th>conexao (dashboard)</th><td id="status-conexao">conectando...</td></tr>
+  <tr><th>dispositivo (esp32)</th><td id="status-dispositivo">desconhecido</td></tr>
+  <tr><th>porta</th><td id="status-porta">-</td></tr>
+  <tr><th>armado</th><td id="status-armado">-</td></tr>
+  <tr><th>disparado</th><td id="status-disparado">-</td></tr>
+  <tr><th>aberturas</th><td id="status-aberturas">-</td></tr>
+  <tr><th>rssi</th><td id="status-rssi">-</td></tr>
+</table>
+
+<h1>access/grupo5 :: comando</h1>
+<div class="comandos">
+  <button id="btn-armar">armar</button>
+  <button id="btn-desarmar">desarmar</button>
+  <button id="btn-disparar">disparar</button>
+  <button id="btn-silenciar">silenciar</button>
+</div>
+
+<h1>access/grupo5 :: log</h1>
+<div id="log"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var TOPICO_SENSOR_PRESENCA = "access/grupo5/sensor/presenca";
+  var TOPICO_COMANDO_ALARME = "access/grupo5/comando/alarme";
+  var TOPICO_STATUS_CONFIRMACAO = "access/grupo5/status/confirmacao";
+  var TOPICO_STATUS_PRESENCA_DISPOSITIVO = "access/grupo5/status/presenca_dispositivo";
+  var TOPICO_STATUS_CORINGA = "access/grupo5/status/#";
+
+  function log(linha) {
+    var el = document.getElementById("log");
+    var hora = new Date().toLocaleTimeString("pt-BR");
+    el.textContent += "[" + hora + "] " + linha + "\n";
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function definirTexto(id, texto, classe) {
+    var el = document.getElementById(id);
+    el.textContent = texto;
+    el.className = classe || "";
+  }
+
+  var client = mqtt.connect(ACCESS_CONFIG.mqttUri, {
+    username: ACCESS_CONFIG.usuario,
+    password: ACCESS_CONFIG.senha,
+    clientId: "access-dashboard-" + Math.random().toString(16).slice(2),
+  });
+
+  client.on("connect", function () {
+    definirTexto("status-conexao", "conectado", "ok");
+    log("conectado ao broker");
+    client.subscribe(TOPICO_SENSOR_PRESENCA);
+    client.subscribe(TOPICO_STATUS_CORINGA);
+  });
+
+  client.on("reconnect", function () {
+    definirTexto("status-conexao", "reconectando...", "neutro");
+  });
+
+  client.on("close", function () {
+    definirTexto("status-conexao", "desconectado", "alerta");
+  });
+
+  client.on("error", function (erro) {
+    log("erro de conexao: " + erro);
+  });
+
+  client.on("message", function (topico, payload) {
+    var texto = payload.toString();
+    log(topico + " " + texto);
+
+    if (topico === TOPICO_SENSOR_PRESENCA) {
+      tratarTelemetria(texto);
+    } else if (topico === TOPICO_STATUS_PRESENCA_DISPOSITIVO) {
+      tratarPresencaDispositivo(texto);
+    } else if (topico === TOPICO_STATUS_CONFIRMACAO) {
+      tratarConfirmacao(texto);
+    }
+  });
+
+  function tratarTelemetria(texto) {
+    var dados;
+    try {
+      dados = JSON.parse(texto);
+    } catch (erro) {
+      log("telemetria invalida, ignorada: " + texto);
+      return;
+    }
+
+    definirTexto("status-porta", dados.porta, dados.porta === "aberta" ? "alerta" : "ok");
+    definirTexto("status-armado", dados.armado ? "sim" : "nao");
+    definirTexto("status-disparado", dados.disparado ? "sim" : "nao", dados.disparado ? "alerta" : "ok");
+    definirTexto("status-aberturas", String(dados.aberturas));
+    definirTexto("status-rssi", dados.rssi + " dBm");
+
+    avaliarDisparoAutomatico(dados);
+  }
+
+  // Regra automática de disparo remoto: é o único lugar do painel que decide
+  // acionar o alarme sozinho, sem clique manual. Fica isolada aqui de
+  // propósito — é o trecho alterado ao vivo durante a validação individual.
+  function avaliarDisparoAutomatico(dados) {
+    if (dados.porta === "aberta" && dados.armado === true) {
+      publicarComando("disparar");
+    }
+  }
+
+  function tratarPresencaDispositivo(texto) {
+    var online = texto === "online";
+    definirTexto("status-dispositivo", online ? "online" : "offline", online ? "ok" : "offline");
+  }
+
+  function tratarConfirmacao(texto) {
+    var dados;
+    try {
+      dados = JSON.parse(texto);
+    } catch (erro) {
+      return;
+    }
+    log("confirmacao: comando=" + dados.comando + " aplicado=" + dados.aplicado);
+  }
+
+  function publicarComando(comando) {
+    client.publish(TOPICO_COMANDO_ALARME, comando);
+    log("comando publicado: " + comando);
+  }
+
+  document.getElementById("btn-armar").addEventListener("click", function () {
+    publicarComando("armar");
+  });
+  document.getElementById("btn-desarmar").addEventListener("click", function () {
+    publicarComando("desarmar");
+  });
+  document.getElementById("btn-disparar").addEventListener("click", function () {
+    publicarComando("disparar");
+  });
+  document.getElementById("btn-silenciar").addEventListener("click", function () {
+    publicarComando("silenciar");
+  });
+})();
+</script>
 </body>
 </html>

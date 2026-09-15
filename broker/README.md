@@ -11,18 +11,25 @@ no README principal). Roda direto no host (sem container), em `accessgrupo5.duck
   `access_web` é o inverso).
 - `nginx/access.conf` — vhost com TLS (Let's Encrypt), redirect HTTP→HTTPS, proxy de `/mqtt` para o
   WebSocket local com rate-limit, e um listener de debug na `8081` (LAN/Tailscale).
-- `www/index.html` — placeholder servido pelo nginx.
+- `www/index.html` — painel de telemetria (assina `sensor/presenca` e `status/#`, publica em
+  `comando/alarme`). Arquivo único, sem build, usa `mqtt.js` via CDN.
+- `www/config.example.js` — modelo do `config.js` que `index.html` carrega (endpoint e credenciais
+  do usuário `access_web`). Sem valor real, versionado normalmente.
 
 ## O que NÃO está aqui (de propósito)
 - `mosquitto/passwd` (hash das senhas) e os certificados TLS — ficam só no servidor.
 - Senhas dos usuários `access_esp32` e `access_web` — geradas com `mosquitto_passwd`, combinadas
   fora do repo.
+- `www/config.js` — copiado de `config.example.js` **direto no servidor**, com a senha real do
+  `access_web`. Está no `.gitignore`; nunca sai daqui.
 
 ## Deploy (no servidor)
 ```bash
 sudo cp broker/mosquitto/access.conf /etc/mosquitto/conf.d/access.conf
 sudo cp broker/mosquitto/acl        /etc/mosquitto/acl
-sudo mkdir -p /var/www/access && sudo cp broker/www/index.html /var/www/access/index.html
+sudo mkdir -p /var/www/access
+sudo cp broker/www/index.html /var/www/access/index.html
+sudo cp broker/www/config.js  /var/www/access/config.js  # criado à mão a partir do config.example.js, com a senha real
 sudo cp broker/nginx/access.conf /etc/nginx/sites-available/access
 sudo ln -sf /etc/nginx/sites-available/access /etc/nginx/sites-enabled/access
 
