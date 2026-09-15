@@ -2,7 +2,11 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <WiFi.h>
-#include <HTTPClient.h>
+#include <time.h>
+#include <ArduinoJson.h>
+#include "mqtt_client.h"
+#include "esp_crt_bundle.h"
+
 #include "secrets.h"
 #include "config.h"
 
@@ -12,53 +16,111 @@
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-// --- CREDENCIAIS SEGURAS ---
-const char* ssid      = WIFI_SSID;
-const char* password  = WIFI_PASS;
-const char* ntfyTopic = NTFY_TOPIC;
+// --- PINOS ---
+const int REED_PIN   = 4;   // Sensor magnético MC-38
+const int BUZZER_POS = 25;  // Buzzer (+)
+const int BUZZER_GND = 18;  // Buzzer (-) -> GND Virtual
 
-// --- VARIÁVEIS DE ESTADO ---
+// --- ESTADO DO SISTEMA ---
 int contadorAberturas = 0;
 bool ultimoEstado = false;
 unsigned long tempoUltimaMudanca = 0;
 unsigned long tempoUltimoAlarme = 0;
 bool tomAlarme = false;
 
-// --- CONTROLE DE RECONEXÃO WI-FI (NÃO-BLOQUEANTE) ---
-unsigned long ultimaChecagemWifi = 0;
-const unsigned long intervaloChecagemWifi = INTERVALO_CHECAGEM_WIFI;
-
-// --- ESTADO DO ALARME (MQTT) ---
-// sistemaArmado: alterada apenas por comando remoto (Etapa 5).
-// alarmeDisparado: escrita exclusivamente pelo handler de eventos MQTT,
-// com a única exceção do modo degradado (Etapa 7). Nenhum outro trecho do
-// firmware deve atribuir valor a ela.
+// Flags de contrato (apenas leitura nesta etapa)
 bool sistemaArmado = false;
 bool alarmeDisparado = false;
 
-// --- ESTADO DA CONEXÃO COM O BROKER MQTT ---
+// --- CONTROLE MQTT (ESP-IDF) ---
+esp_mqtt_client_handle_t clienteMqtt;
 bool brokerConectado = false;
-unsigned long ultimoContatoBroker = 0; // usado pelo modo degradado (Etapa 7)
+unsigned long ultimoContatoBroker = 0;
+static unsigned long ultimaTelemetria = 0;
 
-void enviarNotificacao() {
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    String url = "https://ntfy.sh/" + String(ntfyTopic);
-    
-    http.begin(url);
-    http.addHeader("Title", "Alerta de Seguranca");
-    http.addHeader("Priority", "high");
-    http.addHeader("Tags", "warning,door");
-    
-    String mensagem = "A porta foi aberta! Total de aberturas: " + String(contadorAberturas);
-    http.POST(mensagem);
-    http.end();
-    Serial.println("[HTTP] Notificacao enviada com sucesso ao celular via ntfy.sh");
-  } else {
-    Serial.println("[HTTP] Alerta nao enviado: Wi-Fi desconectado.");
+// --- CONTROLE DE WI-FI ---
+unsigned long ultimaChecagemWifi = 0;
+const unsigned long intervaloChecagemWifi = 5000;
+
+// --- SINCRONIZAÇÃO DE HORA (SNTP PARA TLS) ---
+void sincronizarHora() {
+  configTime(0, 0, "pool.ntp.org", "time.google.com");
+  Serial.print("[SNTP] Aguardando hora valida");
+  time_t agora = time(nullptr);
+  while (agora < 8 * 3600 * 2) {
+    delay(200);
+    Serial.print(".");
+    agora = time(nullptr);
+  }
+  Serial.println("\n[SNTP] Hora sincronizada.");
+}
+
+// --- TELEMETRIA MQTT ---
+void publicarTelemetria(bool portaAberta) {
+  if (!brokerConectado) return;
+
+  StaticJsonDocument<200> doc;
+  doc["porta"]      = portaAberta ? "aberta" : "fechada";
+  doc["armado"]     = sistemaArmado;
+  doc["disparado"]  = alarmeDisparado;
+  doc["aberturas"]  = contadorAberturas;
+  doc["rssi"]       = WiFi.RSSI();
+
+  char buffer[200];
+  size_t tamanho = serializeJson(doc, buffer);
+  esp_mqtt_client_publish(clienteMqtt, TOPICO_SENSOR_PRESENCA, buffer, tamanho, 0, false);
+  ultimoContatoBroker = millis();
+  Serial.printf("[MQTT Telemetria] %s\n", buffer);
+}
+
+// --- HANDLER DE EVENTOS MQTT ---
+static void mqttEventHandler(void* handlerArgs, esp_event_base_t base, int32_t eventId, void* eventData) {
+  esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t) eventData;
+
+  switch (event->event_id) {
+    case MQTT_EVENT_CONNECTED:
+      brokerConectado = true;
+      ultimoContatoBroker = millis();
+      Serial.println("[MQTT] Conectado ao broker.");
+      esp_mqtt_client_publish(clienteMqtt, TOPICO_STATUS_PRESENCA_DISPOSITIVO, "online", 0, 0, true);
+      publicarTelemetria(digitalRead(REED_PIN));
+      break;
+
+    case MQTT_EVENT_DISCONNECTED:
+      brokerConectado = false;
+      Serial.println("[MQTT] Desconectado do broker.");
+      break;
+
+    case MQTT_EVENT_ERROR:
+      Serial.println("[MQTT] Erro de conexao (confira certificado e hora do sistema).");
+      break;
+
+    default:
+      break;
   }
 }
 
+// --- INICIALIZAÇÃO MQTT SOBRE WSS ---
+void iniciarMqtt() {
+  String clientId = "access-" + WiFi.macAddress();
+
+  esp_mqtt_client_config_t cfg = {};
+  cfg.broker.address.uri = MQTT_URI;
+  cfg.broker.verification.crt_bundle_attach = esp_crt_bundle_attach;
+  cfg.credentials.username = MQTT_USER;
+  cfg.credentials.authentication.password = MQTT_PASS;
+  cfg.credentials.client_id = clientId.c_str();
+  cfg.session.last_will.topic = TOPICO_STATUS_PRESENCA_DISPOSITIVO;
+  cfg.session.last_will.msg = "offline";
+  cfg.session.last_will.qos = 0;
+  cfg.session.last_will.retain = true;
+
+  clienteMqtt = esp_mqtt_client_init(&cfg);
+  esp_mqtt_client_register_event(clienteMqtt, MQTT_EVENT_ANY, mqttEventHandler, NULL);
+  esp_mqtt_client_start(clienteMqtt);
+}
+
+// --- BUZZER ---
 void somPortaFechou() {
   tone(BUZZER_POS, 1800, 40);
   delay(60);
@@ -69,14 +131,11 @@ void processarAlarmePortaAberta() {
   if (millis() - tempoUltimoAlarme > 150) {
     tempoUltimoAlarme = millis();
     tomAlarme = !tomAlarme;
-    if (tomAlarme) {
-      tone(BUZZER_POS, 1200, 120);
-    } else {
-      tone(BUZZER_POS, 800, 120);
-    }
+    tone(BUZZER_POS, tomAlarme ? 1200 : 800, 120);
   }
 }
 
+// --- INTERFACE OLED ---
 void desenharIconePorta(int x, int y, bool aberta) {
   display.drawRect(x, y, 22, 36, SSD1306_WHITE);
   if (aberta) {
@@ -94,18 +153,19 @@ void atualizarDashboard(bool aberta) {
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
 
-  // Barra de status com indicativo de rede
   display.fillRect(0, 0, 128, 12, SSD1306_WHITE);
   display.setTextColor(SSD1306_BLACK);
   display.setTextSize(1);
-  display.setCursor(4, 2);
-  display.print("ACESSO");
+  display.setCursor(2, 2);
+  display.print("ACCESS");
 
-  display.setCursor(62, 2);
-  if (WiFi.status() == WL_CONNECTED) {
-    display.print("[WI-FI ON]");
+  display.setCursor(54, 2);
+  if (WiFi.status() != WL_CONNECTED) {
+    display.print("[NO WIFI]");
+  } else if (!brokerConectado) {
+    display.print("[NO MQTT]");
   } else {
-    display.print("[RECONECT]");
+    display.print("[ONLINE]");
   }
 
   display.setTextColor(SSD1306_WHITE);
@@ -113,11 +173,7 @@ void atualizarDashboard(bool aberta) {
 
   display.setTextSize(2);
   display.setCursor(38, 18);
-  if (aberta) {
-    display.println("ABERTA");
-  } else {
-    display.println("FECHADA");
-  }
+  display.println(aberta ? "ABERTA" : "FECHADA");
 
   display.drawLine(38, 36, 124, 36, SSD1306_WHITE);
 
@@ -140,102 +196,97 @@ void atualizarDashboard(bool aberta) {
 }
 
 void conectarWiFi() {
-  Serial.println("\n[Wi-Fi] Iniciando conexao ao AP...");
+  Serial.println("\n[Wi-Fi] Conectando...");
   WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
 
   int tentativas = 0;
-  while (WiFi.status() != WL_CONNECTED && tentativas < 20) {
+  while (WiFi.status() != WL_CONNECTED && tentativas < 25) {
     delay(500);
     Serial.print(".");
     tentativas++;
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n[Wi-Fi] Conectado com sucesso!");
-    Serial.print("[Wi-Fi] Endereco IP (DHCP): ");
+    Serial.println("\n[Wi-Fi] Conectado!");
+    Serial.print("[Wi-Fi] IP DHCP: ");
     Serial.println(WiFi.localIP());
-    Serial.print("[Wi-Fi] Forca do sinal (RSSI): ");
-    Serial.print(WiFi.RSSI());
-    Serial.println(" dBm");
-  } else {
-    Serial.println("\n[Wi-Fi] Falha ao conectar inicialmente. O sistema continuara em loop.");
   }
 }
 
 void verificarReconexaoWiFi() {
   if (millis() - ultimaChecagemWifi > intervaloChecagemWifi) {
     ultimaChecagemWifi = millis();
-
     if (WiFi.status() != WL_CONNECTED) {
-      Serial.println("\n[Wi-Fi] Conexao perdida detectada!");
-      Serial.println("[Wi-Fi] Tentando reconectar automaticamente...");
+      Serial.println("\n[Wi-Fi] Desconectado! Reconectando...");
       WiFi.reconnect();
-    } else {
-      // Confirmação periódica de conectividade mantida
-      Serial.print("[Wi-Fi OK | RSSI: ");
-      Serial.print(WiFi.RSSI());
-      Serial.println(" dBm]");
     }
   }
 }
 
 void setup() {
   Serial.begin(115200);
+
   pinMode(REED_PIN, INPUT_PULLUP);
 
-  // Configuração do Buzzer com terra virtual (D18)
   pinMode(BUZZER_POS, OUTPUT);
   pinMode(BUZZER_GND, OUTPUT);
-  digitalWrite(BUZZER_GND, LOW);
+  digitalWrite(BUZZER_GND, LOW); // Terra virtual
 
-  Wire.begin(OLED_SDA, OLED_SCL);
-
-  if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR_PRIMARIO)) {
-    display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR_ALTERNATIVO);
+  Wire.begin(21, 22);
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3D);
   }
 
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(10, 25);
-  display.println("Iniciando Sistema...");
+  display.println("Iniciando...");
   display.display();
 
   conectarWiFi();
+  sincronizarHora();
+  iniciarMqtt();
 
   ultimoEstado = digitalRead(REED_PIN);
   tempoUltimaMudanca = millis();
 }
 
 void loop() {
-  // 1. Checagem e reconexão automática de rede (não bloqueante)
   verificarReconexaoWiFi();
 
-  // 2. Leitura do sensor magnético MC-38
+  // 1. Telemetria periódica
+  if (millis() - ultimaTelemetria > INTERVALO_TELEMETRIA) {
+    ultimaTelemetria = millis();
+    publicarTelemetria(ultimoEstado);
+  }
+
+  // 2. Transições de estado do sensor
   bool estadoAtual = digitalRead(REED_PIN);
 
   if (estadoAtual != ultimoEstado) {
     if (estadoAtual == true) { 
       contadorAberturas++;
-      Serial.printf("\n[EVENTO] Porta Aberta! Contagem: %d\n", contadorAberturas);
-      enviarNotificacao();
+      Serial.printf("\n[EVENTO] Porta Aberta! Total: %d\n", contadorAberturas);
+      publicarTelemetria(true);
     } else { 
       Serial.println("\n[EVENTO] Porta Fechada.");
       somPortaFechou();
+      publicarTelemetria(false);
     }
     ultimoEstado = estadoAtual;
     tempoUltimaMudanca = millis();
   }
 
-  // 3. Alarme sonoro
+  // 3. Sirene local
   if (estadoAtual == true) {
     processarAlarmePortaAberta();
   } else {
     noTone(BUZZER_POS);
   }
 
-  // 4. Renderização do display
+  // 4. Renderização gráfica
   atualizarDashboard(estadoAtual);
   delay(30);
 }
