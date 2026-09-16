@@ -232,9 +232,22 @@
   // Regra automática de disparo remoto: é o único lugar do painel que decide
   // acionar o alarme sozinho, sem clique manual. Fica isolada aqui de
   // propósito — é o trecho alterado ao vivo durante a validação individual.
+  //
+  // Dispara só na transição para a condição (porta abriu armada), não em
+  // toda telemetria. Sem isso, a cada nova telemetria com a porta ainda
+  // aberta e o sistema ainda armado — o que acontece a cada ~5s mesmo sem
+  // nada mudar — o painel republicava "disparar" de novo, atropelando um
+  // "silenciar" manual segundos depois de ele ter funcionado.
+  var disparoAutomaticoJaAcionado = false;
+
   function avaliarDisparoAutomatico(dados) {
-    if (dados.porta === "aberta" && dados.armado === true) {
+    var condicaoDisparo = dados.porta === "aberta" && dados.armado === true;
+
+    if (condicaoDisparo && !disparoAutomaticoJaAcionado) {
+      disparoAutomaticoJaAcionado = true;
       publicarComando("disparar", "auto");
+    } else if (!condicaoDisparo) {
+      disparoAutomaticoJaAcionado = false;
     }
   }
 
