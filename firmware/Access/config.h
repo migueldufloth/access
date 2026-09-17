@@ -15,6 +15,7 @@
 #define INTERVALO_TELEMETRIA         5000   // publicação periódica de telemetria
 #define INTERVALO_ATUALIZACAO_OLED    200   // cadência de redesenho do display
 #define TIMEOUT_MODO_DEGRADADO      30000   // sem contato com o broker -> decide localmente
+#define DEBOUNCE_SENSOR_MS             50   // tempo mínimo de estabilidade p/ aceitar mudança do MC-38
 
 // --- TÓPICOS MQTT (access/grupo5/...) ---
 #define TOPICO_SENSOR_PRESENCA              "access/grupo5/sensor/presenca"

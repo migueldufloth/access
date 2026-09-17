@@ -23,6 +23,15 @@ unsigned long tempoUltimaMudanca = 0;
 unsigned long tempoUltimoAlarme = 0;
 bool tomAlarme = false;
 
+// --- LEITURA VALIDADA DO SENSOR (DEBOUNCE POR TEMPO) ---
+// leituraBrutaAnterior/tempoUltimaLeituraBruta só existem para o filtro de
+// lerSensorValidado() detectar quando o PINO mudou; estadoValidado é o valor
+// já filtrado que o resto do firmware deve usar (é isso que digitalRead(REED_PIN)
+// direto no loop() não fornecia antes desta versão).
+bool leituraBrutaAnterior = false;
+bool estadoValidado = false;
+unsigned long tempoUltimaLeituraBruta = 0;
+
 // sistemaArmado só é escrita no tratamento de comando MQTT (tratarComando).
 // alarmeDisparado também só é escrita ali, com uma única exceção: o modo
 // degradado (avaliarModoDegradado), quando o broker some por mais de
@@ -54,6 +63,34 @@ void sincronizarHora() {
     agora = time(nullptr);
   }
   Serial.println("\n[SNTP] Hora sincronizada.");
+}
+
+// --- LEITURA VALIDADA DO SENSOR ---
+// Só aceita uma mudança de estado do MC-38 como real depois que o pino ficar
+// estável por DEBOUNCE_SENSOR_MS. Sem isso, bounce mecânico do reed switch no
+// instante exato da abertura/fechamento (ou ruído elétrico) seria aceito na
+// hora e propagado direto para contadorAberturas, publicarTelemetria,
+// avaliarModoDegradado e atualizarDashboard, contando/alertando um evento que
+// pode não ter acontecido de verdade. Debounce por tempo (não por contagem de
+// amostras), no mesmo padrão não bloqueante do resto do firmware — nenhum
+// delay(), só millis(), igual verificarReconexaoWiFi() e avaliarModoDegradado().
+bool lerSensorValidado() {
+  bool leituraBruta = digitalRead(REED_PIN);
+
+  if (leituraBruta != leituraBrutaAnterior) {
+    // O pino mudou agora — ainda não sabemos se é real ou só bounce.
+    // Reinicia a contagem de estabilidade a partir deste instante.
+    tempoUltimaLeituraBruta = millis();
+    leituraBrutaAnterior = leituraBruta;
+  }
+
+  if (leituraBruta != estadoValidado &&
+      (millis() - tempoUltimaLeituraBruta) >= DEBOUNCE_SENSOR_MS) {
+    // Ficou estável tempo suficiente: agora sim é uma mudança real, não ruído.
+    estadoValidado = leituraBruta;
+  }
+
+  return estadoValidado;
 }
 
 // --- TELEMETRIA MQTT ---
@@ -165,7 +202,10 @@ static void mqttEventHandler(void* handlerArgs, esp_event_base_t base, int32_t e
       Serial.println("[MQTT] Conectado ao broker.");
       esp_mqtt_client_publish(clienteMqtt, TOPICO_STATUS_PRESENCA_DISPOSITIVO, "online", 0, 0, true);
       esp_mqtt_client_subscribe(clienteMqtt, TOPICO_COMANDO_ALARME, 0);
-      publicarTelemetria(digitalRead(REED_PIN));
+      // estadoValidado (não digitalRead direto) — a reconexão MQTT pode cair
+      // bem no meio de um bounce do sensor; publicar o valor já filtrado
+      // evita telemetria inconsistente logo na primeira mensagem.
+      publicarTelemetria(estadoValidado);
       break;
 
     case MQTT_EVENT_DISCONNECTED:
@@ -339,14 +379,20 @@ void setup() {
   sincronizarHora();
   iniciarMqtt();
 
-  ultimoEstado = digitalRead(REED_PIN);
+  // Inicializa a leitura validada com o estado real do pino no boot, para o
+  // primeiro ciclo do loop() não enxergar uma transição falsa.
+  leituraBrutaAnterior = digitalRead(REED_PIN);
+  estadoValidado = leituraBrutaAnterior;
+  tempoUltimaLeituraBruta = millis();
+
+  ultimoEstado = estadoValidado;
   tempoUltimaMudanca = millis();
 }
 
 void loop() {
   verificarReconexaoWiFi();
 
-  bool estadoAtual = digitalRead(REED_PIN);
+  bool estadoAtual = lerSensorValidado();
   avaliarModoDegradado(estadoAtual);
 
   // 1. Telemetria periódica

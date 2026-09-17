@@ -69,9 +69,9 @@ Desenvolver um protótipo com ESP32 capaz de detectar abertura de porta via sens
 | Modo degradado (decide localmente sem contato com o broker por 30s) | Implementado |
 | Dashboard web (`broker/www/index.html`) sobre `mqtt.js`/`wss` | Implementado |
 | Notificação HTTP via `ntfy.sh` | Removida (substituída pelo fluxo MQTT acima) |
+| Leitura validada do sensor (debounce por tempo, `lerSensorValidado()`) | Implementado |
 | Reorganização do firmware em múltiplos arquivos (hoje é `Access.ino` + `config.h`) | A fazer |
 | Modo armado/desarmado por botão físico e LED de status | A fazer |
-| Validação de leituras implausíveis do sensor antes de publicar | A fazer |
 | `docs/infraestrutura-broker.md` e `docs/broker-contingencia.md` dedicados | A fazer (ver [broker/README.md](broker/README.md) enquanto isso) |
 
 ## Arquitetura do Sistema e Comunicação MQTT
@@ -218,7 +218,7 @@ infraestrutura de servidor:
   broker. Para rodar localmente, copie `broker/www/config.example.js` para `broker/www/config.js`
   com o usuário/senha reais do `access_web` (esse `config.js` está no `.gitignore` e nunca deve
   ser versionado) e abra `broker/www/index.html` no navegador.
-- **Validação da leitura:** o firmware deve descartar/ignorar leituras implausíveis do sensor antes de publicar telemetria (ver backlog).
+- **Validação da leitura:** `lerSensorValidado()` só aceita uma mudança de estado do MC-38 como real depois que o pino ficar estável por `DEBOUNCE_SENSOR_MS` (50 ms, ajustável em `config.h`) — debounce por tempo, não por contagem de amostras, filtrando bounce mecânico do reed switch e ruído elétrico antes de contar aberturas ou publicar telemetria.
 
 ## Segurança
 
@@ -287,7 +287,7 @@ de decisão do alarme (ver [Protótipo do Circuito](#versão-3--mqtt-sobre-wss-i
 | Publicar confirmação em `access/grupo5/status/confirmacao` | v2 | Leonardo Lotério | 15/09 | Feito |
 | Mover a decisão de disparo do alarme para fora do `loop()`, passando pela mensageria | v2 | Gustavo Franz | 15/09 | Feito |
 | Reconexão do broker MQTT, separada da reconexão do Wi-Fi | v2 | Gustavo Franz | 15/09 | Feito (automática, embutida no `esp_mqtt_client`) |
-| Validar leitura do sensor antes de publicar | v2 | Miguel Angel Balladares | 15/09 | A fazer |
+| Validar leitura do sensor antes de publicar | v2 | Miguel Angel Balladares | 15/09 | Feito |
 | Diagrama do circuito v2 e novo projeto no Wokwi | v2 | Adrian Marcio Roth | 15/09 | A fazer |
 | Documentação técnica do firmware (`firmware/README.md`) | v2 | Miguel Angelo Dufloth | 20/09 | A fazer |
 | Ensaio da demonstração e da validação individual | v2 | Todos | 20/09 | A fazer |
