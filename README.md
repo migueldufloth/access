@@ -23,6 +23,21 @@ A ausência de monitoramento automatizado e em tempo real sobre a abertura de po
 **Contexto:** Ambientes que exigem monitoramento contínuo de acesso e presença, como salas de servidores/TI, escritórios, almoxarifados ou residências.
 **Usuário:** Administradores de segurança, gestores de TI ou proprietários que necessitam receber alertas instantâneos de intrusão/abertura de portas e controlar o estado de alarme remotamente.
 
+## Estado atual (herdado da N1)
+Protótipo com ESP32, sensor magnético MC-38, buzzer e display OLED que detecta a abertura de uma porta, publica telemetria por MQTT sobre `wss` (TLS) e aceita comando remoto com confirmação — mas ainda sem backend, banco de dados nem histórico, com uma única entrada física e um único dispositivo: o painel web fala direto com o broker e a regra de disparo roda no navegador.
+
+## Direção do upgrade (N2/N3)
+O upgrade mantém o mesmo problema e o mesmo usuário e acrescenta as camadas que faltam (proposta do CP12 — tecnologias de servidor ainda a confirmar):
+- **Dois dispositivos físicos** (porta e janela/ambiente), cada um com `deviceId`, e uma segunda entrada de tipo diferente (botão e PIR além do reed).
+- **Contrato MQTT versionado** (`CONTRATOS.md`): tópicos por dispositivo, JSON com versão, `deviceId`, timestamp e unidades, comando com `commandId` e confirmação com resultado.
+- **Backend (FastAPI) + PostgreSQL + Mosquitto** subindo com um único comando (Docker Compose): o backend valida e grava as mensagens, aplica as regras e é o único que publica comandos.
+- **Ciclo de comando com confirmação** em quatro estados (enviado, recebido, executado, confirmado) e rejeição com motivo.
+- **Decisão em duas camadas:** regra local no firmware (funciona sem rede) e regra remota/agendamento no backend.
+- **Interface web** com login, estado por dispositivo, histórico, alertas, painel analítico e envio de comando; **notificação externa** (Telegram).
+- **Firmware** com configuração persistente (NVS), estado seguro, OTA; **testes automatizados e CI** (pytest + GitHub Actions).
+
+Proposta completa, conferência contra os requisitos R1–R18 e diagramas da arquitetura-alvo: [`docs/cp12/`](docs/cp12/).
+
 ## Objetivo da N1
 Desenvolver um protótipo com ESP32 capaz de detectar abertura de porta via sensor magnético e botão, operar em modos armado/desarmado, emitir um alerta/alarme local (buzzer, display e LED), publicar telemetria via MQTT com Wi-Fi e permitir o acionamento de comandos remotos de controle de estado com confirmação de ação.
 
@@ -50,6 +65,7 @@ Desenvolver um protótipo com ESP32 capaz de detectar abertura de porta via sens
 - `/firmware/Access` — código-fonte do ESP32 (sketch da Arduino IDE)
 - `/hardware` — esquemáticos, datasheets e especificação de componentes
 - `/docs` — documentação do projeto (entregas por aula)
+  - `/docs/cp12` — proposta de upgrade (CP12): PDF entregue, fonte em Markdown e diagramas (`diagramas/*.svg`)
 - `/broker` — config do broker MQTT (Mosquitto) e do proxy nginx que atendem
   `access/grupo5/#` em produção (ver [broker/README.md](broker/README.md))
 
@@ -307,7 +323,7 @@ de decisão do alarme (ver [Protótipo do Circuito](#versão-3--mqtt-sobre-wss-i
 | Reorganizar o firmware em múltiplos arquivos (rede/sensor/alarme/display) | v3 | — | 20/09 | A fazer |
 | `docs/infraestrutura-broker.md` e `docs/broker-contingencia.md` dedicados | v3 | Miguel Angelo Dufloth Filho | 20/09 | A fazer |
 | Atualizador de IP do DuckDNS no servidor | v3 | Miguel Angelo Dufloth Filho | 20/09 | A fazer |
-| Tag `v3` | v3 | Miguel Angelo Dufloth Filho | — | A fazer |
+| Tag `v3` | v3 | Miguel Angelo Dufloth Filho | — | Feito (tag `v3` em `8831f6d`; o estado defendido na N1 é `50a9bd7`) |
 
 > [`docs/aprofundamento-aula04.md`](docs/aprofundamento-aula04.md) registra o planejamento e
 > os status da Versão 1 no momento da Aula 04 — é um registro histórico, não atualizado desde
@@ -323,6 +339,8 @@ de decisão do alarme (ver [Protótipo do Circuito](#versão-3--mqtt-sobre-wss-i
 
 ## Documentação
 
+- [`docs/cp12/`](docs/cp12/) — CP12 (20/10/2026): proposta de upgrade do projeto N1 para a N3, seções 1 a 4
+  (PDF, fonte em Markdown e diagramas da arquitetura-alvo e dos fluxos do dado e do comando).
 - [`broker/README.md`](broker/README.md) — estrutura, deploy e teste do broker Mosquitto/nginx.
 - [`docs/roteiro-mqtt-lucas.md`](docs/roteiro-mqtt-lucas.md) — roteiro técnico usado para migrar
   o firmware de HTTP para MQTT.
