@@ -55,7 +55,7 @@ Na v3, um fio solto no reed lê como "aberta", igual a uma abertura real. Para d
 
 Fio rompido ou curto por mais de 3 s coloca o firmware no modo SEGURO e gera o código de erro `E_SENSOR_FALHA`. As faixas são calculadas; a calibração no ADC real do ESP32 (que não é linear) é feita na Unidade 3. **Plano B**, se a supervisão não ficar confiável: voltar ao reed digital no GPIO4 e detectar falha por ausência de mudança de estado por um período configurável.
 
-## Pendências
+## Em aberto
 
 - Segundo ESP32 ainda não adquirido (bloqueia o R13).
 - Confirmar o modelo exato do buzzer (piezoelétrico ou eletromagnético) e a corrente real no datasheet.

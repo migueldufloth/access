@@ -7,7 +7,7 @@
 | **Equipe (nº e nome)** | 05 — Access (Grupo 5) |
 | **Projeto (N1 → N3)** | Access — controle de acesso e presença: detecção de abertura não autorizada de portas e janelas |
 | **Integrantes** | Lucas Honorato dos Santos · Miguel Angel Balladares Huertas · Miguel Angelo Dufloth Filho · Gustavo Franz · Leonardo Lotério de Lima · Adrian Marcio Roth |
-| **Data / Versão** | 27/10/2026 · v1.0 **completa** (seções 1 a 9 e anexos; as seções 1 a 4 foram entregues em 20/10 e aparecem aqui com as pendências já resolvidas atualizadas) |
+| **Data / Versão** | 27/10/2026 · v1.0 **completa** (seções 1 a 9 e anexos) |
 | **Repositório** | <https://github.com/migueldufloth/access> |
 
 ---
@@ -33,8 +33,8 @@ O projeto da N1 comporta o upgrade: mantém o mesmo problema e o mesmo usuário,
 | **Hardware** | 1 ESP32 (Kit V1 ESP-WROOM-32); reed MC-38 no GPIO 4; buzzer no GPIO 25 (GPIO 18 mantido em LOW como terra); OLED I²C (GPIO 21/22). Botão e LED da v1 não reintegrados. Montagem em protoboard, alimentação por micro-USB. | **2 dispositivos físicos** (R13). **A — porta:** reed + botão armar/desarmar, buzzer, LED de status, OLED. **B — janela/ambiente:** reed + PIR HC-SR501, buzzer, LED de status. Segundo ESP32 a adquirir. Atuadores com proteção e alimentação dimensionadas (calculadas na Seção 5), esquema elétrico, BOM e mapa de pinos no repositório, caixa para acabamento. |
 | **Firmware** | Arduino, `Access.ino` + `config.h`. Leitura com debounce, reconexão de Wi-Fi e MQTT, dashboard OLED, modo degradado. Parâmetros fixos no código; estado "armado" volátil; boot bloqueia esperando SNTP. | Reorganizado em módulos (rede, sensores, alarme, display, configuração, OTA). **Regra local** que funciona sem rede (armado + abertura sem desarme no tempo de entrada → buzzer/LED). **Configuração persistente em NVS** (estado armado, tempo de entrada, intervalo de telemetria) alterável por comando. **Estado seguro** definido. Boot sem depender da rede. `deviceId` e timestamp (ou indicação de hora não sincronizada) em toda mensagem. Validação além do debounce e detecção de falha de sensor. `commandId` e intertravamento. **OTA.** |
 | **Comunicação (MQTT)** | 4 tópicos fixos em `access/grupo5/…`, sem deviceId. Telemetria em JSON sem versão, timestamp nem unidade. Comando em texto puro; confirmação sem `commandId`. QoS 0. TLS (`wss`) e Last Will já existem. | **Contrato versionado (`CONTRATOS.md`)** com árvore por dispositivo (`access/grupo5/<deviceId>/…`: telemetria, estado, comando, confirmação, status com Last Will). JSON com versão, `deviceId`, timestamp e unidades; comandos com `commandId`; confirmação com resultado e código de erro; QoS e retain justificados por tópico (QoS 1 em comando e confirmação). ACL por dispositivo. v0 no CP12, congelado como v1 na Aula 13. |
-| **Backend** | *(não existia)* | Serviço em **Python/FastAPI** (proposta): assina os tópicos, valida cada mensagem contra o contrato (descarta e registra as inválidas), persiste, aplica regras, notifica e expõe a API REST usada pela interface. É o **único** que publica comandos e também serve o binário do OTA. |
-| **Banco de dados** | *(não existia)* | **PostgreSQL** (proposta), consultável na demonstração. Tabelas previstas: `dispositivos`, `medicoes` (dispositivo, grandeza, valor, unidade, timestamp), `comandos` (commandId, origem, ação, enviado em, resultado, confirmado em), `alertas`, `mensagens_invalidas`, `usuarios`, `eventos_status` (base do uptime) e `agendamentos` (campos na Seção 7.2). Esquema versionado no repositório (script ou migração). |
+| **Backend** | *(não existia)* | Serviço em **Python/FastAPI**: assina os tópicos, valida cada mensagem contra o contrato (descarta e registra as inválidas), persiste, aplica regras, notifica e expõe a API REST usada pela interface. É o **único** que publica comandos e também serve o binário do OTA. |
+| **Banco de dados** | *(não existia)* | **PostgreSQL**, consultável na demonstração. Tabelas previstas: `dispositivos`, `medicoes` (dispositivo, grandeza, valor, unidade, timestamp), `comandos` (commandId, origem, ação, enviado em, resultado, confirmado em), `alertas`, `mensagens_invalidas`, `usuarios`, `eventos_status` (base do uptime) e `agendamentos` (campos na Seção 7.2). Esquema versionado no repositório (script ou migração). |
 | **Interface** | Painel estático (`mqtt.js`) que assina e publica direto no broker, com a senha no navegador. Sem histórico, sem login, sem alertas persistentes. OLED local. | Aplicação web que fala **somente com a API**. Login; estado atual por dispositivo, com unidade; último contato; online/offline; alertas ativos; histórico (tabela e gráfico); painel analítico (R14); envio de comando com os estados enviado → recebido → executado → confirmado e motivo da rejeição; alteração de configuração. Identidade visual própria (nome, cores, ícones). |
 | **Decisão/regra** | A regra "porta abriu com sistema armado → `disparar`" roda **no navegador**; no firmware só existe o modo degradado após 30 s sem broker. | **Duas camadas.** *Local (firmware):* armado + abertura sem desarme no tempo de entrada → alarme local, com ou sem rede. *Remota (backend):* abertura com sistema armado persistente por mais de N s → registra alerta, notifica no Telegram e gera comando `disparar` com o mesmo ciclo do R7; mais um **agendamento** de armar/desarmar (ex.: armar às 22h, desarmar às 6h, configurável). |
 
@@ -300,15 +300,15 @@ O PDF é a proposta; o repositório é a prova. O conteúdo do repositório corr
 | | |
 |---|---|
 | **Link do repositório** | <https://github.com/migueldufloth/access> (público, acessível sem convite) |
-| **Hash do commit entregue** | *(preencher com o hash do commit enviado ao GitHub, `git rev-parse --short HEAD`)* |
+| **Hash do commit entregue** | `4b1336a` (commit que reúne todo o conteúdo técnico deste documento: contrato, esquemas elétricos e diagramas) |
 
 | Integrante | Usuário GitHub (com commit próprio no repositório) |
 |---|---|
-| Lucas Honorato dos Santos | *(preencher)* |
-| Miguel Angel Balladares Huertas | *(preencher)* |
+| Lucas Honorato dos Santos | `honoratoog` |
+| Miguel Angel Balladares Huertas | `miguettohuertas` |
 | Miguel Angelo Dufloth Filho | `migueldufloth` |
 | Gustavo Franz | `Gusgb4` |
-| Leonardo Lotério de Lima | *(preencher)* — **ainda sem commit no repositório** |
+| Leonardo Lotério de Lima | `leonardosth` |
 | Adrian Marcio Roth | `adrianrothh` |
 
 ---
@@ -363,18 +363,3 @@ Esboço das telas (a identidade visual final, com nome, cores e ícones, é defi
 - **MQTT:** `allow_anonymous false`; um usuário por dispositivo, com ACL que o limita aos próprios tópicos; usuário `access_backend` como único publicador de `comando`; interface web sem acesso ao broker (some a senha `access_web` do navegador).
 - **Transporte:** TLS (`wss`, certificado Let's Encrypt validado pelo cliente) para dispositivos fora da LAN.
 - **OTA:** HTTPS validado, SHA-256 conferido contra o valor do comando e rollback automático se o novo firmware não conectar ao broker.
-
----
-
-## Checklist antes do envio
-
-- ☒ Seções 1 a 4 enviadas (parcial entregue em 20/10).
-- ☐ Repositório no GitHub atualizado até 22h30, com o `README.md` apontando para onde o projeto vai. Público: ☒. *(falta o commit e o push desta versão)*
-- ☒ Tabela de verificação elétrica preenchida com valores calculados, não medidos.
-- ☒ Esquema elétrico desenhado e anexado (`hardware/`).
-- ☒ Fluxograma do firmware desenhado.
-- ☒ Conferência R1 a R18 sem linha em branco (pendências declaradas, não omitidas).
-- ☒ Cronograma até a N3 preenchido.
-- ☒ Tecnologias pretendidas justificadas; nenhuma plataforma fechada da seção 4.1.
-- ☐ Repositório com commit de cada integrante listado. *(Leonardo Lotério de Lima ainda não tem commit.)*
-- ☐ Todos os integrantes revisaram o documento completo antes do envio.
