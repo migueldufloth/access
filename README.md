@@ -36,7 +36,7 @@ O upgrade mantém o mesmo problema e o mesmo usuário e acrescenta as camadas qu
 - **Interface web** com login, estado por dispositivo, histórico, alertas, painel analítico e envio de comando; **notificação externa** (Telegram).
 - **Firmware** com configuração persistente (NVS), estado seguro, OTA; **testes automatizados e CI** (pytest + GitHub Actions).
 
-Proposta completa, conferência contra os requisitos R1–R18 e diagramas da arquitetura-alvo: [`docs/cp12/`](docs/cp12/).
+Proposta completa (CP12, 27/10/2026), com conferência contra os requisitos R1–R18, arquitetura-alvo, hardware calculado, fluxograma do firmware, tecnologias, cronograma e riscos: [`docs/cp12/`](docs/cp12/). O contrato MQTT da N3 está congelado como v1 em [`CONTRATOS.md`](CONTRATOS.md) e o projeto de hardware em [`hardware/`](hardware/).
 
 ## Objetivo da N1
 Desenvolver um protótipo com ESP32 capaz de detectar abertura de porta via sensor magnético e botão, operar em modos armado/desarmado, emitir um alerta/alarme local (buzzer, display e LED), publicar telemetria via MQTT com Wi-Fi e permitir o acionamento de comandos remotos de controle de estado com confirmação de ação.
@@ -63,9 +63,10 @@ Desenvolver um protótipo com ESP32 capaz de detectar abertura de porta via sens
 
 ## Estrutura do Repositório
 - `/firmware/Access` — código-fonte do ESP32 (sketch da Arduino IDE)
-- `/hardware` — esquemáticos, datasheets e especificação de componentes
+- `/hardware` — esquemas elétricos dos dois dispositivos da N3, mapa de pinos, BOM e verificação elétrica calculada (ver [hardware/README.md](hardware/README.md))
+- `CONTRATOS.md` — contrato MQTT v1 da N3 (tópicos, payloads, comandos, erros, QoS/retain)
 - `/docs` — documentação do projeto (entregas por aula)
-  - `/docs/cp12` — proposta de upgrade (CP12): PDF entregue, fonte em Markdown e diagramas (`diagramas/*.svg`)
+  - `/docs/cp12` — proposta de upgrade (CP12): PDFs entregues (parcial de 20/10 e completo de 27/10), fonte em Markdown e diagramas (`diagramas/*.svg`)
 - `/broker` — config do broker MQTT (Mosquitto) e do proxy nginx que atendem
   `access/grupo5/#` em produção (ver [broker/README.md](broker/README.md))
 
@@ -339,8 +340,11 @@ de decisão do alarme (ver [Protótipo do Circuito](#versão-3--mqtt-sobre-wss-i
 
 ## Documentação
 
-- [`docs/cp12/`](docs/cp12/) — CP12 (20/10/2026): proposta de upgrade do projeto N1 para a N3, seções 1 a 4
-  (PDF, fonte em Markdown e diagramas da arquitetura-alvo e dos fluxos do dado e do comando).
+- [`docs/cp12/`](docs/cp12/) — CP12: proposta de upgrade do projeto N1 para a N3. Parcial de 20/10/2026 (seções 1 a 4) e
+  versão completa de 27/10/2026 (seções 1 a 9 e anexos), com PDF, fonte em Markdown e diagramas (arquitetura-alvo, fluxos do dado
+  e do comando, fluxograma do firmware e esboço das telas).
+- [`CONTRATOS.md`](CONTRATOS.md) — contrato MQTT v1 da N3 (congelado em 27/10/2026).
+- [`hardware/`](hardware/README.md) — esquemas elétricos, mapa de pinos, BOM e verificação elétrica calculada (projeto, ainda não montado).
 - [`broker/README.md`](broker/README.md) — estrutura, deploy e teste do broker Mosquitto/nginx.
 - [`docs/roteiro-mqtt-lucas.md`](docs/roteiro-mqtt-lucas.md) — roteiro técnico usado para migrar
   o firmware de HTTP para MQTT.
