@@ -7,12 +7,14 @@ no README principal). Roda direto no host (sem container), em `accessgrupo5.duck
 ## Estrutura
 - `mosquitto/access.conf` — listeners (`1883` MQTT puro, `9001` WebSocket em loopback), autenticação
   obrigatória, path da ACL.
-- `mosquitto/acl` — permissões por usuário (`access_esp32` publica telemetria/status e lê comando;
-  `access_web` é o inverso).
+- `mosquitto/acl` — permissões por usuário (`access_esp32` tem `readwrite` em `sensor/#` e
+  `status/#` para a comunicação distribuída entre a Central ESP32-S3 e o Satélite ESP32, além de
+  `read` em `comando/#`; `access_web` lê `sensor/#`/`status/#` e escreve `comando/#`).
 - `nginx/access.conf` — vhost com TLS (Let's Encrypt), redirect HTTP→HTTPS, proxy de `/mqtt` para o
   WebSocket local com rate-limit, e um listener de debug na `8081` (LAN/Tailscale).
-- `www/index.html` — painel de telemetria (assina `sensor/presenca` e `status/#`, publica em
-  `comando/alarme`). Arquivo único, sem build, usa `mqtt.js` via CDN.
+- `www/index.html` — painel de monitoramento v2 (assina `sensor/#` e `status/#` para exibir
+  Central, Satélite, Porta, Movimento, Alarme, Aberturas e RSSI). Arquivo único, sem build, usa
+  `mqtt.js` via CDN.
 - `www/config.example.js` — modelo do `config.js` que `index.html` carrega (endpoint e credenciais
   do usuário `access_web`). Sem valor real, versionado normalmente.
 
@@ -43,8 +45,13 @@ sudo systemctl restart mosquitto
 
 ## Teste rápido
 ```bash
-mosquitto_sub -h localhost -p 1883 -u access_web -P "$PW_WEB" -t 'access/grupo5/sensor/#' -v
-mosquitto_pub -h localhost -p 1883 -u access_esp32 -P "$PW_ESP" -t 'access/grupo5/sensor/presenca' -m '{"porta":"aberta"}'
+# Acompanhar todos os tópicos v2 (porta, movimento, alarme, telemetria e online/offline)
+mosquitto_sub -h localhost -p 1883 -u access_web -P "$PW_WEB" -t 'access/grupo5/#' -v
+
+# Simular eventos das duas placas (requer ACL v2 aplicada em /etc/mosquitto/acl)
+mosquitto_pub -h localhost -p 1883 -u access_esp32 -P "$PW_ESP" -t 'access/grupo5/sensor/porta' -m 'ABERTA' -r
+mosquitto_pub -h localhost -p 1883 -u access_esp32 -P "$PW_ESP" -t 'access/grupo5/sensor/movimento' -m 'DETECTADO' -r
+mosquitto_pub -h localhost -p 1883 -u access_esp32 -P "$PW_ESP" -t 'access/grupo5/status/alarme' -m '1' -r
 ```
 
 ## Conectividade externa (ESP32 em rede diferente do broker)

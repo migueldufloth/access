@@ -62,12 +62,15 @@ Desenvolver um protótipo com ESP32 capaz de detectar abertura de porta via sens
   confirmação de execução (ver [Arquitetura do Sistema e Comunicação MQTT](#arquitetura-do-sistema-e-comunicação-mqtt)).
 
 ## Estrutura do Repositório
-- `/firmware/Access` — código-fonte do ESP32 (sketch da Arduino IDE)
+- `/firmware` — firmwares dos microcontroladores (ver [firmware/README.md](firmware/README.md))
+  - `/firmware/firmware-central-s3` — **v2 (Placa 1 — ESP32-S3 Central da Porta):** MC-38, OLED SSD1306, I2S MAX98357, LED local, lógica combinada, `ntfy.sh` e MQTT sobre `wss://`
+  - `/firmware/firmware-satelite-esp32` — **v2 (Placa 2 — ESP32 Satélite de Movimento):** PIR HC-SR501 / Ultrassônico HC-SR04 + LED remoto sincronizado via MQTT sobre `wss://`
+  - `/firmware/Access` — firmware legado v1/N1 (placa única com buzzer)
 - `/hardware` — esquemas elétricos dos dois dispositivos da N3, mapa de pinos, BOM e verificação elétrica calculada (ver [hardware/README.md](hardware/README.md))
 - `CONTRATOS.md` — contrato MQTT v1 da N3 (tópicos, payloads, comandos, erros, QoS/retain)
 - `/docs` — documentação do projeto (entregas por aula)
   - `/docs/cp12` — proposta de upgrade (CP12): PDFs entregues (parcial de 20/10 e completo de 27/10), fonte em Markdown e diagramas (`diagramas/*.svg`)
-- `/broker` — config do broker MQTT (Mosquitto) e do proxy nginx que atendem
+- `/broker` — config do broker MQTT (Mosquitto), ACL v2, proxy nginx e dashboard web que atendem
   `access/grupo5/#` em produção (ver [broker/README.md](broker/README.md))
 
 ## Status Atual da Implementação
