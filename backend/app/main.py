@@ -26,6 +26,16 @@ WEB = Path(__file__).resolve().parent / "web"
 INTERVALO_CICLO_S = 2
 
 
+class Estaticos(StaticFiles):
+    """Interface com revalidação obrigatória: depois de um deploy, o navegador nunca mistura
+    o index.html novo com o app.js ou app.css antigos do cache."""
+
+    def file_response(self, *args, **kwargs):
+        resposta = super().file_response(*args, **kwargs)
+        resposta.headers["Cache-Control"] = "no-cache"
+        return resposta
+
+
 class LoginIn(BaseModel):
     usuario: str
     senha: str
@@ -233,5 +243,5 @@ def create_app(config: Config | None = None, publicar=None, notificador=None, ci
             raise HTTPException(404, "firmware não encontrado")
         return FileResponse(caminho, media_type="application/octet-stream")
 
-    app.mount("/", StaticFiles(directory=WEB, html=True), name="web")
+    app.mount("/", Estaticos(directory=WEB, html=True), name="web")
     return app

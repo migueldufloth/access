@@ -162,7 +162,7 @@ dependem de gravar nas placas o firmware adaptado ao contrato v1. O guia está e
 ## Reaproveitamento declarado
 - **Bibliotecas:** FastAPI, Uvicorn, paho-mqtt, psycopg, PyJWT, bcrypt, httpx e pytest (via
   `requirements*.txt`); **Chart.js 4.4.7** (licença MIT), copiado sem alteração em
-  `backend/app/web/vendor/`; imagens oficiais `postgres` e `eclipse-mosquitto`.
+  `backend/app/web/vendor/`; ícone "door-closed" do **Lucide** (licença ISC) no logotipo e no favicon; imagens oficiais `postgres` e `eclipse-mosquitto`.
 - **Projeto Sala Inteligente:** usado como referência de arquitetura (backend como único
   publicador de comandos, ciclo de confirmação). Modelo de dados, regras, contrato e interface
   foram escritos para o problema do Access.

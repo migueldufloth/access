@@ -3,104 +3,127 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Access · Monitor de Acessos</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2314b8a6' d='M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z'/%3E%3C/svg%3E">
+  <meta name="theme-color" content="#111111">
+  <title>Access</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23161616'/%3E%3Cg transform='translate(3.6 3.2) scale(.7)' fill='none' stroke='%237ec699' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14'/%3E%3Cpath d='M2 20h20'/%3E%3Cpath d='M14 12v.01'/%3E%3C/g%3E%3C/svg%3E">
   <link rel="stylesheet" href="app.css">
   <script src="vendor/chart.umd.min.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <symbol id="i-escudo" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z" fill="currentColor"/><path d="m8.5 12 2.5 2.5 4.5-5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="i-porta" viewBox="0 0 24 24"><path d="M6 3h10a1 1 0 0 1 1 1v17H5V4a1 1 0 0 1 1-1zm8 9h-1v2h1z" fill="currentColor"/><path d="M3 21h18" stroke="currentColor" stroke-width="2"/></symbol>
-    <symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5" fill="currentColor"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></symbol>
-    <symbol id="i-sino" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zm-2 15a2 2 0 0 0 4 0z" fill="currentColor"/></symbol>
-  </svg>
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <!-- Ícone "door-closed" do Lucide (lucide.dev, licença ISC) -->
+  <symbol id="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14"/><path d="M2 20h20"/><path d="M14 12v.01"/></symbol>
+</svg>
 
-  <!-- Login -->
-  <main id="tela-login" class="login" hidden>
-    <form id="form-login" class="cartao login-cartao">
-      <div class="marca grande"><svg><use href="#i-escudo"/></svg><span>Access</span></div>
-      <p class="sub">Monitoramento de portas e ambientes, com alarme e aviso no celular.</p>
-      <label>Usuário <input name="usuario" autocomplete="username" required></label>
-      <label>Senha <input name="senha" type="password" autocomplete="current-password" required></label>
-      <button class="primario" type="submit">Entrar</button>
-      <p id="erro-login" class="erro" role="alert"></p>
-    </form>
+<main id="tela-login" class="login" hidden>
+  <form id="form-login">
+    <div class="marca grande"><svg><use href="#logo"/></svg>Access</div>
+    <p class="fraco">Monitoramento de acessos</p>
+    <label>Usuário <input name="usuario" autocomplete="username" autocapitalize="none" required></label>
+    <label>Senha <input name="senha" type="password" autocomplete="current-password" required></label>
+    <button type="submit" class="primario">Entrar</button>
+    <p id="erro-login" class="alerta" role="alert"></p>
+  </form>
+</main>
+
+<div id="tela-painel" hidden>
+  <header class="topo">
+    <div class="marca"><svg><use href="#logo"/></svg>Access</div>
+    <div class="conta"><span id="usuario"></span><button id="sair" class="link">Sair</button></div>
+  </header>
+
+  <div id="faixas" aria-live="assertive"></div>
+
+  <main>
+    <section>
+      <h2>Dispositivos</h2>
+      <div id="dispositivos" class="dispositivos"></div>
+    </section>
+
+    <section id="secao-alertas" hidden>
+      <h2>Alertas ativos</h2>
+      <div id="alertas" class="alertas"></div>
+    </section>
+
+    <section>
+      <h2>Comandos recentes</h2>
+      <table class="lista" id="tabela-comandos">
+        <thead><tr><th>Quando</th><th>Dispositivo</th><th>Ação</th><th>Enviado por</th><th>Situação</th><th>Detalhe</th></tr></thead>
+        <tbody id="comandos"></tbody>
+      </table>
+    </section>
+
+    <section>
+      <div class="titulo-secao">
+        <h2>Histórico</h2>
+        <div class="filtros">
+          <select id="sel-disp" aria-label="Dispositivo"></select>
+          <select id="sel-horas" aria-label="Período">
+            <option value="1">Última hora</option><option value="24" selected>Últimas 24 horas</option><option value="168">Últimos 7 dias</option>
+          </select>
+        </div>
+      </div>
+      <div id="indicadores" class="indicadores"></div>
+      <div class="historico">
+        <figure>
+          <figcaption id="tit-eventos">Aberturas por hora</figcaption>
+          <div class="grafico"><canvas id="g-eventos"></canvas></div>
+        </figure>
+        <figure>
+          <figcaption>Sinal Wi-Fi (dBm)
+            <span class="legenda"><i class="traco cinza"></i>leitura <i class="traco verde"></i>média</span>
+          </figcaption>
+          <div class="grafico"><canvas id="g-rssi"></canvas></div>
+        </figure>
+        <figure>
+          <figcaption id="tit-ultimos">Últimas mudanças</figcaption>
+          <table class="simples"><tbody id="ultimos"></tbody></table>
+        </figure>
+      </div>
+    </section>
+
+    <section class="so-admin">
+      <h2>Configurações</h2>
+      <div class="configuracao">
+        <form id="form-limite">
+          <h3>Escalonamento</h3>
+          <p class="fraco">Se a porta ficar aberta com o sistema armado por mais tempo que isso, o Access avisa no celular e dispara as sirenes do local.</p>
+          <label>Limite em segundos <input name="limite" type="number" min="10" max="600" inputmode="numeric" required></label>
+          <button class="primario">Salvar</button>
+        </form>
+        <form id="form-entrada">
+          <h3>Tempo de entrada</h3>
+          <p class="fraco">Tempo para desarmar depois de abrir a porta, antes de a sirene tocar. Fica gravado no dispositivo.</p>
+          <label>Dispositivo <select name="device" class="sel-dispositivos"></select></label>
+          <label>Segundos <input name="tempo" type="number" min="0" max="120" inputmode="numeric" required></label>
+          <button class="primario">Enviar ao dispositivo</button>
+        </form>
+        <form id="form-agenda">
+          <h3>Agendamentos</h3>
+          <p class="fraco">Arma ou desarma sozinho no horário escolhido.</p>
+          <div id="agendamentos" class="agendamentos"></div>
+          <div class="linha">
+            <select name="acao" aria-label="Ação"><option value="armar">Armar</option><option value="desarmar">Desarmar</option></select>
+            <select name="device" class="sel-dispositivos" aria-label="Dispositivo"></select>
+            <input name="hora" type="time" required aria-label="Horário">
+          </div>
+          <div id="dias" class="dias"></div>
+          <button class="primario">Adicionar agendamento</button>
+        </form>
+      </div>
+    </section>
+
+    <section>
+      <details id="registro">
+        <summary>Mensagens recusadas pelo servidor</summary>
+        <p class="fraco">Mensagens dos dispositivos fora do contrato. Ficam registradas e são descartadas.</p>
+        <table class="lista"><thead><tr><th>Quando</th><th>Tópico</th><th>Motivo</th></tr></thead><tbody id="invalidas"></tbody></table>
+      </details>
+    </section>
   </main>
+</div>
 
-  <!-- Painel -->
-  <div id="tela-painel" hidden>
-    <header class="topo">
-      <div class="marca"><svg><use href="#i-escudo"/></svg><span>Access</span></div>
-      <div class="usuario"><span id="usuario-nome"></span><span id="usuario-perfil" class="etiqueta"></span>
-        <button id="sair" class="fantasma">Sair</button></div>
-    </header>
-
-    <main class="conteudo">
-      <section id="alertas" class="alertas" aria-live="polite"></section>
-
-      <section>
-        <h2>Dispositivos</h2>
-        <div id="dispositivos" class="grade-disp"></div>
-      </section>
-
-      <section class="cartao">
-        <div class="cab"><h2>Comandos</h2><span class="dica">Um comando só aparece como <b>confirmado</b> depois que o dispositivo publica o novo estado.</span></div>
-        <div class="tabela-rola"><table id="comandos"><thead><tr>
-          <th>Quando</th><th>Dispositivo</th><th>Ação</th><th>Origem</th><th>Progresso</th><th>Detalhe</th>
-        </tr></thead><tbody></tbody></table></div>
-      </section>
-
-      <section class="cartao">
-        <div class="cab"><h2>Histórico e análise</h2>
-          <label class="inline">Dispositivo <select id="sel-disp"></select></label>
-          <label class="inline">Período <select id="sel-horas"><option value="1">1 h</option><option value="24" selected>24 h</option><option value="168">7 dias</option></select></label>
-        </div>
-        <div class="kpis">
-          <div class="kpi"><span>Eventos no período</span><b id="kpi-eventos">–</b></div>
-          <div class="kpi"><span>Tempo em alarme</span><b id="kpi-alarme">–</b></div>
-          <div class="kpi"><span>Disponibilidade</span><b id="kpi-uptime">–</b></div>
-          <div class="kpi"><span>Sinal médio (últimas 5)</span><b id="kpi-rssi">–</b></div>
-        </div>
-        <div class="graficos">
-          <figure><figcaption id="tit-sensor">Sensor ao longo do tempo</figcaption><canvas id="g-sensor"></canvas></figure>
-          <figure><figcaption>Eventos por hora</figcaption><canvas id="g-eventos"></canvas></figure>
-          <figure><figcaption>Sinal Wi-Fi (dBm) e média móvel</figcaption><canvas id="g-rssi"></canvas></figure>
-        </div>
-      </section>
-
-      <section class="cartao so-admin">
-        <h2>Configurações</h2>
-        <div class="config-grade">
-          <form id="form-limite" class="mini-form">
-            <h3>Escalonamento remoto</h3>
-            <p class="dica">Com o sistema armado e a porta aberta por mais que este tempo, o Access avisa no celular e dispara todas as sirenes do local.</p>
-            <label>Limite (s) <input name="limite" type="number" min="10" max="600" required></label>
-            <button class="primario">Salvar</button>
-          </form>
-          <form id="form-entrada" class="mini-form">
-            <h3>Tempo de entrada</h3>
-            <p class="dica">Segundos entre abrir a porta armada e a sirene tocar. Gravado no dispositivo (sobrevive ao reinício).</p>
-            <label>Dispositivo <select name="device" class="sel-dispositivos"></select></label>
-            <label>Tempo (s) <input name="tempo" type="number" min="0" max="120" required></label>
-            <button class="primario">Enviar ao dispositivo</button>
-          </form>
-          <form id="form-agenda" class="mini-form">
-            <h3>Agendamentos</h3>
-            <ul id="agendamentos" class="lista"></ul>
-            <div class="linha">
-              <select name="device" class="sel-dispositivos"></select>
-              <select name="acao"><option value="armar">Armar</option><option value="desarmar">Desarmar</option></select>
-              <input name="hora" type="time" required>
-            </div>
-            <div class="dias" id="dias"></div>
-            <button class="primario">Adicionar</button>
-          </form>
-        </div>
-      </section>
-    </main>
-  </div>
-  <div id="aviso" class="aviso" role="status"></div>
+<div id="aviso" role="status"></div>
 </body>
 </html>
