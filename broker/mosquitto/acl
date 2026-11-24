@@ -1,0 +1,15 @@
+# ACL do contrato v1 (CONTRATOS.md, seção 2).
+# O backend é o único que publica comando; cada dispositivo (usuário = deviceId) só mexe nos próprios tópicos.
+
+user access_backend
+topic read  access/grupo5/+/telemetria
+topic read  access/grupo5/+/estado
+topic read  access/grupo5/+/confirmacao
+topic read  access/grupo5/+/status
+topic write access/grupo5/+/comando
+
+pattern write access/grupo5/%u/telemetria
+pattern write access/grupo5/%u/estado
+pattern write access/grupo5/%u/confirmacao
+pattern write access/grupo5/%u/status
+pattern read  access/grupo5/%u/comando

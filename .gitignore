@@ -14,4 +14,10 @@ build/
 Thumbs.db
 secrets.h
 **/secrets.h
-broker/www/config.js
+
+# Segredos do compose
+.env
+
+# Python
+__pycache__/
+.pytest_cache/

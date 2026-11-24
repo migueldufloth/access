@@ -1,0 +1,59 @@
+# Sobe broker, backend e banco com um único comando (R12):  docker compose up -d --build
+# Variáveis sensíveis vêm do .env (copie de .env.example).
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - dados-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0.20
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/mosquitto/config/entrypoint.sh"]
+    environment:
+      MQTT_SENHA_BACKEND: ${MQTT_SENHA_BACKEND}
+      MQTT_SENHA_PORTA_01: ${MQTT_SENHA_PORTA_01}
+      MQTT_SENHA_JANELA_01: ${MQTT_SENHA_JANELA_01}
+    volumes:
+      - ./broker/mosquitto:/mosquitto/config:ro
+      - dados-mosquitto:/mosquitto/data
+    ports:
+      - "1883:1883"              # dispositivos na LAN/Tailscale
+      - "127.0.0.1:9001:9001"    # WebSocket só para o nginx do host (wss:// na 443)
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      MQTT_HOST: mosquitto
+      MQTT_SENHA_BACKEND: ${MQTT_SENHA_BACKEND}
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_USUARIO: ${ADMIN_USUARIO}
+      ADMIN_SENHA: ${ADMIN_SENHA}
+      OPERADOR_USUARIO: ${OPERADOR_USUARIO}
+      OPERADOR_SENHA: ${OPERADOR_SENHA}
+      NTFY_TOPICO: ${NTFY_TOPICO:-}
+    volumes:
+      - ./firmware/ota:/firmware:ro   # binários do OTA (R17), servidos em /firmware/<arquivo>.bin
+    ports:
+      - "8000:8000"              # interface e API: http://localhost:8000
+
+volumes:
+  dados-db:
+  dados-mosquitto:

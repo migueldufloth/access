@@ -1,94 +1,53 @@
-# Broker MQTT
+# Broker MQTT e proxy
 
-Config do broker Mosquitto e do proxy nginx que atendem o tópico `access/grupo5/#`
-(ver [Arquitetura do Sistema e Comunicação MQTT](../README.md#arquitetura-do-sistema-e-comunicação-mqtt)
-no README principal). Roda direto no host (sem container), em `accessgrupo5.duckdns.org`.
+O Mosquitto sobe pelo [`compose.yaml`](../compose.yaml) da raiz, junto com o backend e o banco.
+Em produção, o nginx do servidor (`accessgrupo5.duckdns.org`) termina o TLS e repassa o tráfego
+para os containers.
 
 ## Estrutura
-- `mosquitto/access.conf` — listeners (`1883` MQTT puro, `9001` WebSocket em loopback), autenticação
-  obrigatória, path da ACL.
-- `mosquitto/acl` — permissões por usuário (`access_esp32` tem `readwrite` em `sensor/#` e
-  `status/#` para a comunicação distribuída entre a Central ESP32-S3 e o Satélite ESP32, além de
-  `read` em `comando/#`; `access_web` lê `sensor/#`/`status/#` e escreve `comando/#`).
-- `nginx/access.conf` — vhost com TLS (Let's Encrypt), redirect HTTP→HTTPS, proxy de `/mqtt` para o
-  WebSocket local com rate-limit, e um listener de debug na `8081` (LAN/Tailscale).
-- `www/index.html` — painel de monitoramento v2 (assina `sensor/#` e `status/#` para exibir
-  Central, Satélite, Porta, Movimento, Alarme, Aberturas e RSSI). Arquivo único, sem build, usa
-  `mqtt.js` via CDN.
-- `www/config.example.js` — modelo do `config.js` que `index.html` carrega (endpoint e credenciais
-  do usuário `access_web`). Sem valor real, versionado normalmente.
+- `mosquitto/mosquitto.conf`: listeners `1883` (MQTT puro: backend e LAN/Tailscale) e
+  `9001` (WebSocket, publicado só em `127.0.0.1` para o nginx), autenticação obrigatória e ACL.
+- `mosquitto/acl`: ACL do contrato v1. O `access_backend` lê telemetria, estado,
+  confirmação e status de todos e é o único que escreve em `comando`. Cada dispositivo
+  (usuário = `deviceId`) só escreve nos próprios tópicos e só lê o próprio `comando`.
+- `mosquitto/entrypoint.sh`: gera o `passwd` na subida a partir das senhas do `.env`
+  (`MQTT_SENHA_BACKEND`, `MQTT_SENHA_PORTA_01`, `MQTT_SENHA_JANELA_01`). Nenhum hash fica no Git.
+- `nginx/access.conf`: vhost do servidor com TLS (Let's Encrypt), redirect HTTP→HTTPS, `/` →
+  backend (`127.0.0.1:8000`) e `/mqtt` → WebSocket do Mosquitto (`127.0.0.1:9001`), com rate-limit.
 
-## O que NÃO está aqui (de propósito)
-- `mosquitto/passwd` (hash das senhas) e os certificados TLS — ficam só no servidor.
-- Senhas dos usuários `access_esp32` e `access_web` — geradas com `mosquitto_passwd`, combinadas
-  fora do repo.
-- `www/config.js` — copiado de `config.example.js` **direto no servidor**, com a senha real do
-  `access_web`. Está no `.gitignore`; nunca sai daqui.
+Novo dispositivo: acrescente a senha no `.env`, uma linha `adicionar <deviceId> ...` no
+`entrypoint.sh` e reinicie o `mosquitto`. A ACL usa `%u`, então não muda.
 
-## Deploy (no servidor)
+## Deploy no servidor
 ```bash
-sudo cp broker/mosquitto/access.conf /etc/mosquitto/conf.d/access.conf
-sudo cp broker/mosquitto/acl        /etc/mosquitto/acl
-sudo mkdir -p /var/www/access
-sudo cp broker/www/index.html /var/www/access/index.html
-sudo cp broker/www/config.js  /var/www/access/config.js  # criado à mão a partir do config.example.js, com a senha real
+git pull
+cp .env.example .env            # só na primeira vez; preencher com as senhas reais
+docker compose up -d --build
+
+# nginx do host (TLS na 443)
 sudo cp broker/nginx/access.conf /etc/nginx/sites-available/access
 sudo ln -sf /etc/nginx/sites-available/access /etc/nginx/sites-enabled/access
-
-# usuários (só na primeira vez / rotação de senha)
-sudo mosquitto_passwd /etc/mosquitto/passwd access_esp32
-sudo mosquitto_passwd /etc/mosquitto/passwd access_web
-
 sudo nginx -t && sudo systemctl reload nginx
-sudo systemctl restart mosquitto
 ```
+O Mosquitto antigo, instalado direto no host (usuários `access_esp32`/`access_web`, contrato v0),
+precisa ser parado antes (`sudo systemctl disable --now mosquitto`), porque o do compose usa as
+mesmas portas `1883` e `9001`.
 
 ## Teste rápido
 ```bash
-# Acompanhar todos os tópicos v2 (porta, movimento, alarme, telemetria e online/offline)
-mosquitto_sub -h localhost -p 1883 -u access_web -P "$PW_WEB" -t 'access/grupo5/#' -v
+# Tudo o que passa no broker (com o usuário do backend, que lê todos os dispositivos)
+docker compose exec mosquitto mosquitto_sub -u access_backend -P "$MQTT_SENHA_BACKEND" -t 'access/grupo5/#' -v
 
-# Simular eventos das duas placas (requer ACL v2 aplicada em /etc/mosquitto/acl)
-mosquitto_pub -h localhost -p 1883 -u access_esp32 -P "$PW_ESP" -t 'access/grupo5/sensor/porta' -m 'ABERTA' -r
-mosquitto_pub -h localhost -p 1883 -u access_esp32 -P "$PW_ESP" -t 'access/grupo5/sensor/movimento' -m 'DETECTADO' -r
-mosquitto_pub -h localhost -p 1883 -u access_esp32 -P "$PW_ESP" -t 'access/grupo5/status/alarme' -m '1' -r
+# Um dispositivo publicando no próprio tópico (aceito) e no de outro (descartado pela ACL)
+docker compose exec mosquitto mosquitto_pub -u porta-01 -P "$MQTT_SENHA_PORTA_01" -t access/grupo5/porta-01/status \
+  -m '{"v":1,"deviceId":"porta-01","status":"online","ts":null,"uptime_s":1,"fw":"1.0.0"}' -r
 ```
 
-## Conectividade externa (ESP32 em rede diferente do broker)
+## Conectividade externa (placa em rede diferente do servidor)
+A `1883` não é exposta à internet: o roteador não encaminha a porta e MQTT puro mandaria a senha
+em texto claro. Fora da LAN/Tailscale, as placas usam MQTT sobre WebSocket com TLS na `443`:
 
-A porta `1883` (MQTT puro) **não é exposta à internet** — o roteador não encaminha essa porta e o
-`ufw` não tem regra liberando-a para fora. Só a `443` está aberta publicamente (via
-`accessgrupo5.duckdns.org`), atendendo HTTPS e o proxy WebSocket. Essa é uma decisão deliberada,
-não uma pendência: expor MQTT puro sem TLS pela internet manda usuário/senha em texto claro.
-
-Consequência prática: um dispositivo em rede diferente da do broker (como o ESP32, que não fica na
-mesma LAN/Tailscale do servidor) **não consegue** se conectar com `PubSubClient` clássico (MQTT
-puro por `WiFiClient`/`WiFiClientSecure` direto na `1883`). Ele precisa falar MQTT dentro de
-WebSocket sobre TLS, no mesmo endpoint que o dashboard já usa:
-
-- **Host:** `accessgrupo5.duckdns.org`
-- **Porta:** `443`
-- **Path:** `/mqtt`
-- **Protocolo:** `wss://`
-
-No firmware, isso significa trocar `PubSubClient` pelo cliente MQTT nativo do ESP-IDF
-(`esp_mqtt_client`, já embutido no core Arduino-ESP32), que aceita `wss://` direto na URI:
-
-```cpp
-#include "mqtt_client.h"
-
-esp_mqtt_client_config_t mqtt_cfg = {};
-mqtt_cfg.broker.address.uri = "wss://accessgrupo5.duckdns.org/mqtt";
-mqtt_cfg.credentials.username = "access_esp32";
-mqtt_cfg.credentials.authentication.password = MQTT_PASS; // via secrets.h, nunca hardcode
-mqtt_cfg.broker.verification.certificate = letsencrypt_isrg_root_x1_pem; // valida o TLS
-
-esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
-esp_mqtt_client_start(client);
-```
-
-É preciso embutir o certificado raiz **ISRG Root X1** da Let's Encrypt no firmware (ou usar o
-`crt_bundle_attach` do ESP-IDF, que já traz os CAs comuns) para validar o TLS.
-
-Se o ESP32 algum dia estiver na mesma LAN ou na Tailscale do broker, aí sim `PubSubClient` na
-`1883` funciona direto, sem WSS.
+- URI: `wss://accessgrupo5.duckdns.org/mqtt`
+- Cliente: `esp_mqtt_client` do ESP-IDF (já no core Arduino-ESP32), com `esp_crt_bundle_attach`
+  para validar o certificado Let's Encrypt.
+- Na LAN/Tailscale do servidor, `mqtt://<ip-do-servidor>:1883` também funciona.
