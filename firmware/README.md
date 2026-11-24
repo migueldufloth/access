@@ -1,78 +1,44 @@
-# Firmwares — Projeto Access (v2 Distribuído)
+# Firmwares — Projeto Access (N3 — Contrato MQTT v1 + ESP-NOW)
 
-> ⚠️ **Em adaptação para o contrato v1:** ver [`docs/firmware-contrato-v1.md`](../docs/firmware-contrato-v1.md).
-
-Esta pasta contém os firmwares da **v2 distribuída** (duas placas ESP32 comunicando-se via broker Mosquitto deste repositório) e mantém o firmware legado da v1/N1 como referência histórica.
+Esta pasta contém os firmwares das **duas placas da N3** falando o [contrato MQTT v1](../CONTRATOS.md) com o backend FastAPI/Mosquitto (e sincronização local instantânea via ESP-NOW), além do firmware legado da N1 como referência histórica.
 
 ## Estrutura
 
-| Pasta | Placa | Papel | Versão |
-| :--- | :--- | :--- | :--- |
-| [`firmware-central-s3/`](firmware-central-s3/) | **ESP32-S3** | **Placa 1 — Central da Porta:** sensor magnético MC-38, display OLED SSD1306, caixa de som I2S MAX98357, LED local, regra combinada e notificação `ntfy.sh` | **v2 (atual)** |
-| [`firmware-satelite-esp32/`](firmware-satelite-esp32/) | **ESP32 Dev Module** | **Placa 2 — Satélite de Movimento:** sensor PIR HC-SR501 e/ou Ultrassônico HC-SR04 + LED de alerta remoto sincronizado | **v2 (atual)** |
-| [`Access/`](Access/) | ESP32 Dev Module | Protótipo legado de placa única com buzzer (N1/v1) | Legado |
-
----
-
-## Arquitetura Híbrida: ESP-NOW + Mosquitto (v2)
-
-A comunicação foi dividida em duas camadas para máxima velocidade e confiabilidade:
-
-1. **Placa 1 ↔ Placa 2 (ESP-NOW direto por rádio 2.4 GHz):**
-   - O Satélite envia detecção de movimento (`DETECTADO`/`LIMPO`) direto para a Central e recebe o estado de alarme (`0`/`1`) para piscar o LED sincronizado — **funciona instantaneamente mesmo sem internet, sem roteador ou sem broker MQTT**.
-   - **Sincronização automática de canal:** no boot, o Satélite escaneia o canal do `WIFI_SSID` configurado no `secrets.h` e, se ficar sem heartbeat da Central por `5 s`, varre automaticamente os canais `1..13` até travar no mesmo canal da Central.
-2. **Placa 1 → Nuvem (Mosquitto + `ntfy.sh`):**
-   - A Central (`ESP32-S3`) conecta no Wi-Fi (com potência controlada em `WIFI_POWER_8_5dBm` para estabilidade da OLED), publica toda a telemetria (`porta`, `movimento`, `alarme`, `central`, `satelite`, `presenca_dispositivo` e JSON `presenca`) no broker Mosquitto deste repositório (`wss://accessgrupo5.duckdns.org/mqtt`) via `esp_mqtt_client` e envia notificação push via `ntfy.sh`.
-   - Para uso em LAN/Tailscale do broker, basta trocar `MQTT_URI` no `secrets.h` para `"mqtt://<IP_DO_SERVIDOR>:1883"`.
-
-### Mapa de Tópicos (`access/grupo5/...`)
-
-| Tópico | Publica | Assina | Payload | Retain |
+| Pasta | Placa | `deviceId` | Papel | Versão |
 | :--- | :--- | :--- | :--- | :--- |
-| `access/grupo5/sensor/porta` | Placa 1 (Central) | Dashboard | `"ABERTA"` \| `"FECHADA"` | Sim |
-| `access/grupo5/sensor/movimento` | Placa 2 (Satélite) | Placa 1 (Central), Dashboard | `"DETECTADO"` \| `"LIMPO"` | Sim |
-| `access/grupo5/sensor/presenca` | Placa 1 (Central) | Dashboard | JSON (`porta`, `movimento`, `disparado`, `aberturas`, `rssi`) | Não |
-| `access/grupo5/status/alarme` | Placa 1 (Central) | Placa 2 (Satélite), Dashboard | `"1"` \| `"0"` | Sim |
-| `access/grupo5/status/central` | Placa 1 (Central + LWT) | Dashboard | `"online"` \| `"offline"` | Sim |
-| `access/grupo5/status/satelite` | Placa 2 (Satélite + LWT) | Dashboard | `"online"` \| `"offline"` | Sim |
-
-> **Contrato v1 (N3):** o servidor agora valida as mensagens contra o [`CONTRATOS.md`](../CONTRATOS.md)
-> e usa um usuário MQTT por dispositivo (`porta-01`, `janela-01`). Os tópicos acima são do formato
-> v2 anterior e são descartados pelo backend. O que muda em cada placa está em
-> [`docs/firmware-contrato-v1.md`](../docs/firmware-contrato-v1.md).
+| [`firmware-central-s3/`](firmware-central-s3/) | **ESP32-S3 Dev Module** | `porta-01` | **Central da Porta:** reed MC-38 (digital ou supervisionado ADC1), OLED SSD1306, caixa de som I²S MAX98357, LED local, regra local sem rede, NVS, OTA HTTPS com SHA-256, MQTT v1 + ESP-NOW | **N3 (`1.0.0`)** |
+| [`firmware-satelite-esp32/`](firmware-satelite-esp32/) | **ESP32 DevKit V1** | `janela-01` | **Satélite de Movimento:** PIR HC-SR501 (com calibração ~60 s) e/ou HC-SR04, LED remoto sincronizado, regra local, NVS, OTA HTTPS com SHA-256, MQTT v1 + ESP-NOW | **N3 (`1.0.0`)** |
+| [`Access/`](Access/) | ESP32 DevKit V1 | — | Protótipo legado de placa única com buzzer (N1) | Legado |
 
 ---
 
-## Pinagem
+## Contrato MQTT v1 e Recursos N3 Implementados nas Duas Placas
 
-### Placa 1 — Central da Porta (`ESP32-S3`)
-| Componente | Pinos | Observações |
-| :--- | :--- | :--- |
-| OLED SSD1306 (128x64 I2C) | `SDA = 14`, `SCL = 12`, `VCC = 4`, `GND = 5` | `VCC`/`GND` com `GPIO_DRIVE_CAP_3`; Wi-Fi fixado em `WIFI_POWER_5dBm` para evitar queda de tensão na tela |
-| Amplificador I2S MAX98357 | `BCLK = 47`, `LRC = 48`, `DIN = 21` | `SAMPLE_RATE = 44100`, driver nativo `driver/i2s.h` |
-| Sensor Magnético MC-38 | `Sinal = 15` (`INPUT_PULLUP`), `GND = 16` (`LOW`) | `HIGH` = porta aberta |
-| LED de Alerta Local | `Positivo = 2`, `GND = 1` (`LOW`) | Pisca sincronizado com a sirene I2S |
-
-### Placa 2 — Satélite de Movimento (`ESP32 Dev Module`)
-| Componente | Pinos | Observações |
-| :--- | :--- | :--- |
-| Sensor PIR HC-SR501 | `GPIO 4` (`INPUT_PULLDOWN`) | `HIGH` = movimento detectado |
-| Sensor Ultrassônico HC-SR04 | `TRIG = 18`, `ECHO = 19` | Dispara quando distância `< 50 cm` |
-| LED de Alerta Remoto | `GPIO 2` | Pisca a cada `120 ms` enquanto `status/alarme == "1"` |
+- **Transporte:** `esp_mqtt_client` (ESP-IDF nativo) sobre `wss://accessgrupo5.duckdns.org/mqtt` (porta 443, TLS validado via `esp_crt_bundle_attach` com SNTP prévio) ou `mqtt://<IP>:1883` em ambiente Docker Compose local.
+- **Tópicos por placa (`access/grupo5/<deviceId>/`):**
+  - `telemetria` (QoS 0, sem retain): `abertura` (`porta-01`) ou `presenca` (`janela-01`), `aberturas` e `rssi`, a cada `intervaloTelemetria_s` e por evento.
+  - `estado` (QoS 1, retido): `fw`, `modo`, `armado`, `alarme`, `sensor`, `config` e `ultimoComandoId`.
+  - `comando` (assinatura QoS 1) e `confirmacao` (QoS 1): ciclo completo (`recebido`/`aceito` ou `rejeitado`, `executado`/`ok` ou `falha`, `estado` com `ultimoComandoId`), catálogo de erros e cache dos últimos 16 `commandId` para reentrega com `duplicado: true`.
+  - `status` (QoS 1, retido): `online` na conexão e Last Will `offline`.
+- **Persistência (NVS / `Preferences`):** `armado`, `tempoEntrada_s`, `intervaloTelemetria_s` e `timeoutManual_s` sobrevivem ao reinício.
+- **Regra local sem Wi-Fi (R2 / R10):** com `armado = true`, abertura inicia `alarme = "entrada"` e após `tempoEntrada_s` dispara a sirene (`"disparado"`) e pisca os LEDs nas duas placas via ESP-NOW mesmo com roteador desligado; ao voltar o Wi-Fi, reconecta sozinha.
+- **Estado seguro:** reed supervisionado (`REED_SUPERVISIONADO = 1`, GPIO 6 ADC1) entra em `modo = "seguro"` (`falha_aberto`/`falha_curto`) em 3 s e volta a `automatico` sem reiniciar; PIR do Satélite reporta `sensor = "calibrando"` nos primeiros ~60 s.
+- **OTA HTTPS (R17):** comando `atualizar_firmware` baixa por HTTPS (`NetworkClientSecure` com `useBuiltinCACertBundle()` + `HTTPC_STRICT_FOLLOW_REDIRECTS`), calcula SHA-256 em streaming via `mbedtls/sha256.h`, aborta com `E_OTA_FALHA` se divergir ou grava e reinicia na nova versão.
 
 ---
 
-## Como Compilar e Gravar
+## Como Compilar e Gravar na Arduino IDE
 
-1. **Criar `secrets.h` em cada pasta** (o arquivo está no `.gitignore` e nunca deve ser commitado):
+1. **Bibliotecas necessárias:**
+   - **Ambas as placas:** `ArduinoJson` (v7, Benoît Blanchon).
+   - **Central (`porta-01`):** `Adafruit GFX Library` e `Adafruit SSD1306`.
+   - Demais (`WiFi`, `NetworkClientSecure`, `HTTPClient`, `Update`, `Preferences`, `esp_now`, `mqtt_client`, `esp_crt_bundle`, `driver/i2s`, `mbedtls/sha256`) já vêm no core **Arduino-ESP32 3.x**.
+2. **Credenciais (`secrets.h`, ignorado pelo `.gitignore`):**
    ```bash
    cp firmware/firmware-central-s3/secrets.example.h firmware/firmware-central-s3/secrets.h
    cp firmware/firmware-satelite-esp32/secrets.example.h firmware/firmware-satelite-esp32/secrets.h
    ```
-   Preencha `WIFI_SSID`, `WIFI_PASS`, `MQTT_URI`, `MQTT_USER` (`access_esp32`), `MQTT_PASS` (e `NTFY_TOPIC` na Central).
-2. **Bibliotecas necessárias (Arduino IDE):**
-   - **Placa 1 (`firmware-central-s3`):** `Adafruit GFX Library` e `Adafruit SSD1306` (demais bibliotecas — `WiFi`, `HTTPClient`, `driver/i2s.h`, `mqtt_client.h`, `esp_crt_bundle.h` — já vêm no core Arduino-ESP32).
-   - **Placa 2 (`firmware-satelite-esp32`):** nenhuma biblioteca externa necessária (tudo embutido no core Arduino-ESP32).
-3. **Placas na Arduino IDE:**
-   - Placa 1: `ESP32S3 Dev Module` (abrir `firmware/firmware-central-s3/firmware-central-s3.ino`).
-   - Placa 2: `ESP32 Dev Module` (abrir `firmware/firmware-satelite-esp32/firmware-satelite-esp32.ino`).
+   Preencha `WIFI_SSID`, `WIFI_PASS`, `MQTT_URI`, `MQTT_USER` (`porta-01` / `janela-01`) e `MQTT_PASS`.
+3. **Partições para OTA (obrigatório para R17):**
+   - Em **Tools → Partition Scheme**, escolha um esquema com **2 slots OTA**, por exemplo **Minimal SPIFFS (1.9MB APP with OTA)** ou **Default 4MB with spiffs** (no S3: **8M with spiffs** ou **Default 4MB with spiffs**).
+4. **Pinagem completa (R1 — sem alimentação/terra por GPIO):** ver [`hardware/mapa-de-pinos.md`](../hardware/mapa-de-pinos.md).

@@ -1,45 +1,46 @@
-# Mapa de pinos — Access N3
+# Mapa de pinos — Access N3 (Hardware Real Montado)
 
-ESP32 DevKit V1 (ESP-WROOM-32). Projeto desenhado no CP12; a montagem física e a validação em bancada ficam para a Unidade 3. Esquemas: [`esquema-dispositivo-a.svg`](esquema-dispositivo-a.svg) e [`esquema-dispositivo-b.svg`](esquema-dispositivo-b.svg).
+Mapa de pinos atualizado conforme os **dois dispositivos efetivamente montados na N3** (Central `ESP32-S3` com amplificador I²S `MAX98357` + caixa de som + OLED + reed `MC-38`, e Satélite `ESP32 DevKit V1` com `PIR HC-SR501` / `HC-SR04` + LED remoto).
 
-## Dispositivo A — porta (`porta-01`)
+> **Conformidade R1 (sem alimentação nem terra virtual por GPIO):** todas as cargas (OLED, MAX98357, PIR/HC-SR04) são alimentadas diretamente pelos barramentos reais (`3V3`, `5V`/`VIN` e `GND`) da placa; os GPIOs transportam apenas sinais de dados/controle e o LED usa resistor limitador em série.
 
-| Função | GPIO | Tipo | Ligação | Observação |
-| :--- | :--- | :--- | :--- | :--- |
-| Reed MC-38 supervisionado | 34 | Entrada analógica (ADC1_CH6) | R1 10 kΩ para 3V3; Rs 2,2 kΩ e Reol 4,7 kΩ junto ao sensor | Lê 4 estados (ver [README](README.md#supervisão-do-reed)). GPIO34 é só entrada, sem pull-up interno: o pull-up é o R1 |
-| Buzzer | 25 | Saída digital (PWM por `tone`) | R2 1 kΩ para a base do Q1 NPN | O buzzer fica entre +5 V e o coletor do Q1; **não** é ligado ao GPIO |
-| LED de status | 26 | Saída digital | R4 220 Ω em série com o LED, catodo no GND | |
-| Botão armar/desarmar | 27 | Entrada digital (`INPUT_PULLUP`) | Botão entre GPIO27 e GND | Debounce de 50 ms em software |
-| OLED SSD1306 — SDA | 21 | I²C | Direto no módulo (3,3 V, endereço 0x3C) | Pull-ups no próprio módulo |
-| OLED SSD1306 — SCL | 22 | I²C | Direto no módulo | |
-| 3V3 | — | Alimentação | OLED e R1 | |
-| VIN (5 V) | — | Alimentação | Buzzer e diodo D1 | Vem do micro-USB |
-| GND | — | Terra | Comum a todos os blocos | Terra virtual do GPIO18 (v3) **eliminado** |
-
-## Dispositivo B — janela / ambiente (`janela-01`)
+## Dispositivo A — Central da Porta (`porta-01`, ESP32-S3)
 
 | Função | GPIO | Tipo | Ligação | Observação |
 | :--- | :--- | :--- | :--- | :--- |
-| Reed MC-38 supervisionado | 34 | Entrada analógica (ADC1_CH6) | Igual ao dispositivo A | |
-| PIR HC-SR501 (OUT) | 13 | Entrada digital | OUT direto; VCC no +5 V (VIN) | Saída em 3,3 V (datasheet). Aquecimento de ~60 s: o firmware reporta `calibrando` e ignora o PIR nesse período |
-| Buzzer | 25 | Saída digital (PWM por `tone`) | Igual ao dispositivo A | |
-| LED de status | 26 | Saída digital | Igual ao dispositivo A | |
-| 3V3 / VIN / GND | — | Alimentação | R1; PIR e buzzer; terra comum | Sem OLED nem botão neste dispositivo |
+| Display OLED SSD1306 — SDA | 14 | I²C | Direto no módulo (endereço `0x3C`) | Pull-ups integrados no módulo |
+| Display OLED SSD1306 — SCL | 12 | I²C | Direto no módulo | |
+| Display OLED — VCC / GND | — | Alimentação | `3V3` e `GND` reais da placa | Alimentação anterior por GPIO4/GPIO5 **eliminada (R1)** |
+| Amplificador I²S MAX98357 — BCLK | 47 | Saída digital (I²S) | Pino `BCLK` do módulo | Driver nativo `driver/i2s.h` (`44100 Hz`) |
+| Amplificador I²S MAX98357 — LRC | 48 | Saída digital (I²S) | Pino `LRC` do módulo | |
+| Amplificador I²S MAX98357 — DIN | 21 | Saída digital (I²S) | Pino `DIN` do módulo | |
+| Amplificador I²S MAX98357 — VIN / GND | — | Alimentação | `5V` e `GND` reais da placa | Alto-falante ligado nas saídas `+`/`−` do amplificador (nunca em GPIO) |
+| Reed MC-38 (modo digital padrão) | 15 | Entrada digital (`INPUT_PULLUP`) | Entre GPIO 15 e `GND` real | `HIGH` = porta aberta (`REED_SUPERVISIONADO = 0`); terra virtual GPIO 16 **eliminado (R1)** |
+| Reed MC-38 (modo supervisionado ADC1) | 6 | Entrada analógica (`ADC1_CH5`) | Divisor R1 10 kΩ (3V3) + Rs 2,2 kΩ + Reol 4,7 kΩ junto ao sensor | Ativável via `REED_SUPERVISIONADO = 1` em `config.h`; detecta 4 estados (`fechada`, `aberta`, `falha_aberto`, `falha_curto`) |
+| LED de alerta local | 2 | Saída digital | GPIO 2 → resistor 220 Ω → anodo (+) do LED → catodo (−) no `GND` real | Corrente ≈ 5,9 mA; terra virtual GPIO 1 **eliminado (R1)** |
+
+## Dispositivo B — Satélite de Movimento (`janela-01`, ESP32 DevKit V1)
+
+| Função | GPIO | Tipo | Ligação | Observação |
+| :--- | :--- | :--- | :--- | :--- |
+| Sensor PIR HC-SR501 (OUT) | 4 | Entrada digital (`INPUT_PULLDOWN`) | `OUT` direto (nível lógico 3,3 V); `VCC` no `VIN` (5 V); `GND` no `GND` | Primeiros ~60 s reporta `sensor = "calibrando"`; jumper em `H` |
+| Sensor Ultrassônico HC-SR04 — TRIG | 18 | Saída digital | Pino `TRIG` (opcional, habilitável em `config.h`) | Pulso de 10 µs a cada 70 ms |
+| Sensor Ultrassônico HC-SR04 — ECHO | 19 | Entrada digital (`INPUT_PULLDOWN`) | Via divisor resistivo 5 V → 3,3 V (1 kΩ + 2 kΩ) | Evita 5 V direto em GPIO; `INPUT_PULLDOWN` evita disparos falsos se desconectado |
+| LED de alerta remoto | 2 | Saída digital | LED onboard ou LED externo via resistor 220 Ω para `GND` | Pisca sincronizado com o alarme da Central via ESP-NOW e com o alarme próprio |
+| VIN (5 V) / GND | — | Alimentação | Alimenta PIR (e HC-SR04) + terra comum | Fonte USB 5 V / 1 A |
 
 ## Conferência das regras de pinagem
 
-- Nenhum uso de GPIO 6 a 11 (flash).
-- Nenhum atuador em pino de strapping (0, 2, 5, 12, 15): o buzzer está no GPIO25 e o LED no GPIO26.
-- O único sensor analógico (reed supervisionado) está no ADC1 (GPIO34); o ADC2 não é usado, porque não lê com o Wi-Fi ativo.
-- GPIO34 a 39 são só entrada e não têm pull-up interno; por isso o reed usa pull-up externo (R1).
+- **Nenhum uso de pinos de flash SPI** (GPIO 6–11 no ESP32 clássico; GPIO 26–32 no ESP32-S3).
+- **Nenhuma carga alimentada por GPIO:** OLED no `3V3`/`GND`, MAX98357 e PIR no `5V`/`VIN` e `GND`, LEDs com resistor limitador em série.
+- **Supervisão analógica em ADC1:** no ESP32-S3, o GPIO 6 pertence ao `ADC1_CH5`, que funciona simultaneamente com o Wi-Fi ativo (ao contrário do ADC2).
+- **Sinal máximo em GPIO = 3,3 V:** saída `OUT` do HC-SR501 já é 3,3 V pelo datasheet; pino `ECHO` do HC-SR04 deve usar divisor resistivo quando conectado.
 
-## Mudanças em relação ao firmware atual (v3)
+## Histórico de evolução em relação ao desenho inicial (CP12)
 
-| Item | Hoje (`config.h`) | N3 |
+| Item | Desenho CP12 | Montagem real N3 |
 | :--- | :--- | :--- |
-| `REED_PIN` | 4, digital com `INPUT_PULLUP` | 34, analógico (ADC1) com supervisão |
-| `BUZZER_POS` | 25, ligado direto no buzzer | 25, ligado à base do transistor Q1 |
-| `BUZZER_GND` | 18, mantido em `LOW` como terra | Removido (o buzzer volta ao GND real) |
-| LED de status | Não implementado | 26 |
-| Botão | Não implementado | 27 (só no dispositivo A) |
-| PIR | Não existe | 13 (só no dispositivo B) |
+| Microcontrolador da Central (`porta-01`) | ESP32 DevKit V1 | **ESP32-S3** |
+| Atuador sonoro da Central | Buzzer 5 V via transistor Q1 | **Amplificador I²S MAX98357 + alto-falante** (GPIO 47/48/21) |
+| OLED / terras virtuais | GPIO 4/5/16/1 (protótipo v2) | **Removidos** — ligados em `3V3` e `GND` reais (R1) |
+| Satélite (`janela-01`) | ESP32 + PIR GPIO 13 + buzzer | **ESP32 DevKit V1 + PIR GPIO 4** (+ suporte opcional HC-SR04 GPIO 18/19) + LED GPIO 2 + ESP-NOW + MQTT |

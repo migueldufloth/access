@@ -1,62 +1,54 @@
 # Hardware — Access N3
 
-Projeto de hardware dos dois dispositivos da N3. Tudo aqui é **desenho e cálculo** (CP12): os valores vêm de datasheet e de contas, não de medição. A montagem e a medição em bancada acontecem na Unidade 3.
+Documentação de hardware dos **dois dispositivos montados na N3** (`porta-01` e `janela-01`), atualizada para refletir a montagem física real após a evolução em relação ao desenho inicial do CP12.
 
 | Arquivo | Conteúdo |
 | :--- | :--- |
-| [`esquema-dispositivo-a.svg`](esquema-dispositivo-a.svg) | Esquema elétrico do dispositivo A (porta): reed, buzzer, LED, botão, OLED |
-| [`esquema-dispositivo-b.svg`](esquema-dispositivo-b.svg) | Esquema elétrico do dispositivo B (janela/ambiente): reed, PIR, buzzer, LED |
-| [`mapa-de-pinos.md`](mapa-de-pinos.md) | GPIO de cada função e conferência das regras de pinagem |
-| [`bom.md`](bom.md) | Lista de materiais: o que já temos e o que falta |
+| [`mapa-de-pinos.md`](mapa-de-pinos.md) | Pinagem real das duas placas (`ESP32-S3` + `ESP32 DevKit V1`) e conferência das regras R1 |
+| [`bom.md`](bom.md) | Lista de materiais efetivamente montados e opcionais de supervisão |
+| [`esquema-dispositivo-a.svg`](esquema-dispositivo-a.svg) | Esquema inicial do CP12 (referência histórica — substituído na Central por ESP32-S3 + MAX98357) |
+| [`esquema-dispositivo-b.svg`](esquema-dispositivo-b.svg) | Esquema inicial do CP12 (referência histórica — no Satélite montado usa PIR no GPIO 4) |
 
-## Dispositivos
+## Dispositivos montados
 
-| | A — `porta-01` | B — `janela-01` |
+| | A — `porta-01` (Central) | B — `janela-01` (Satélite) |
 | :--- | :--- | :--- |
-| Entradas | Reed MC-38 (supervisionado) + botão armar/desarmar | Reed MC-38 (supervisionado) + PIR HC-SR501 |
-| Saídas | Buzzer (via transistor), LED de status, OLED | Buzzer (via transistor), LED de status |
-| Corrente de pico estimada | ≈ 410 mA | ≈ 450 mA |
-| Alimentação | Micro-USB 5 V / 1 A | Micro-USB 5 V / 1 A |
+| Microcontrolador | **ESP32-S3 Dev Module** | **ESP32 DevKit V1 (ESP-WROOM-32)** |
+| Entradas | Sensor magnético MC-38 (GPIO 15 digital ou GPIO 6 ADC1 supervisionado) | Sensor PIR HC-SR501 (GPIO 4) + suporte opcional a HC-SR04 (GPIO 18/19) |
+| Saídas | Amplificador I²S MAX98357A + alto-falante (GPIO 47/48/21), OLED SSD1306 (GPIO 14/12), LED local (GPIO 2 + 220 Ω) | LED de alerta remoto sincronizado (GPIO 2 + 220 Ω ou onboard) |
+| Comunicação | Wi-Fi + MQTT (`wss://`, contrato v1) + ESP-NOW (sincronização local com Satélite) | Wi-Fi + MQTT (`wss://`, contrato v1) + ESP-NOW (sincronização local com Central) |
+| Alimentação | USB-C 5 V / 1 A | Micro-USB 5 V / 1 A |
 
-## Verificação elétrica calculada
+## Verificação elétrica (R1)
 
-| Verificação | Valor calculado | Como será garantido |
+| Verificação | Valor / regra | Como é garantido na montagem N3 |
 | :--- | :--- | :--- |
-| 3V3 usado | OLED ≈ 20 mA, divisor do reed ≈ 0,27 mA; o próprio ESP32 com Wi-Fi ≈ 350 mA de pico. Total no dispositivo A ≈ 375 mA, abaixo dos 800 mA do regulador da placa | Medir a corrente total na bancada (Unidade 3) |
-| 5 V / VIN usado | Buzzer ≤ 30 mA; PIR ≤ 65 mA (dispositivo B). Total USB: A ≈ 410 mA, B ≈ 450 mA | Fonte 5 V / 1 A em cada dispositivo, cabo curto e capacitor de 100 µF entre VIN e GND |
-| Corrente do buzzer | ≤ 30 mA, **fora do GPIO**: o GPIO25 entrega só a corrente de base, Ib = (3,3 − 0,7) V / 1 kΩ = 2,6 mA. O transistor satura, porque basta Ib ≈ 0,3 mA para 30 mA com hFE ≥ 100 | Q1 NPN com R2 de 1 kΩ |
-| Corrente do LED | (3,3 − 2,0) V / 220 Ω ≈ 5,9 mA, dentro do limite do GPIO (absoluto 40 mA) | R4 de 220 Ω em série |
-| GND comum | Uma única fonte por dispositivo; todos os terras terminam nos pinos GND da mesma placa. A e B são independentes, sem terra compartilhado entre eles | Conferir continuidade na montagem |
-| Maior tensão em um GPIO | **3,3 V**, em todos. O único sensor alimentado com 5 V é o PIR HC-SR501, cuja saída é 3,3 V pelo datasheet. Nenhum sinal de 5 V chega a GPIO | Medir o OUT do PIR com multímetro antes de ligar na placa |
-| Proteção de carga indutiva | Diodo D1 1N4148 em antiparalelo com o buzzer (catodo no +5 V). Se o buzzer for piezoelétrico, não há bobina e o diodo é redundante; se for eletromagnético, ele é necessário | D1 previsto nos dois esquemas |
-| Estado seguro do atuador no boot | Buzzer **desligado**. Durante reset e boot o GPIO25 fica em alta impedância, e o R3 de 10 kΩ mantém a base do Q1 em 0 V. O LED também fica apagado. Os GPIO25 e 26 não são pinos de strapping. No `setup()`, os dois vão para `LOW` antes de qualquer outra coisa | R3 no esquema + inicialização no firmware |
+| Alimentação de cargas fora dos GPIOs | **Nenhuma carga alimentada por GPIO** | OLED alimentada no pino `3V3` e `GND` reais; MAX98357A e PIR alimentados no `5V`/`VIN` e `GND` reais. Os pinos virtuais do protótipo v2 (GPIO 1, 4, 5, 16) foram removidos do firmware |
+| Corrente no barramento `3V3` (`porta-01`) | OLED ≈ 20 mA + ESP32-S3 Wi-Fi (TX limitado a `WIFI_POWER_8_5dBm`) ≈ 220 mA pico → total ≈ 240 mA (bem abaixo do regulador de 500–800 mA) | Potência de TX controlada em `config.h` evita quedas de tensão na OLED |
+| Corrente no barramento `5V`/`VIN` | MAX98357A (~200–350 mA em pico de sirene); PIR HC-SR501 ≤ 65 mA | Alimentação 5 V dedicada por placa + geração senoidal no driver I²S nativo (`driver/i2s.h`) |
+| Corrente nos LEDs | `(3,3 − 2,0) V / 220 Ω ≈ 5,9 mA`, bem abaixo do limite do GPIO | Resistor de 220 Ω em série com cada LED, catodo no `GND` real |
+| Tensão máxima nos GPIOs | **3,3 V** em todos os pinos | Saída `OUT` do PIR HC-SR501 é 3,3 V pelo datasheet; `ECHO` do HC-SR04 (se ligado) usa divisor 1 kΩ / 2 kΩ |
+| Estado seguro no boot | Sirene muda e LEDs em `LOW` | `digitalWrite(LED_POS_PIN, LOW)` / `digitalWrite(LED_ALARME_PIN, LOW)` e `i2s_zero_dma_buffer()` no `setup()` |
 
-Checklist de desenho:
+Checklist R1:
+- [x] Nenhuma carga (OLED, amplificador, PIR, LED) alimentada diretamente por GPIO.
+- [x] Terras virtuais em GPIO eliminados — todos os retornos no `GND` real.
+- [x] LEDs com resistor limitador de 220 Ω em série.
+- [x] Nenhum sinal de 5 V ligado diretamente a um GPIO.
+- [x] Nenhum uso de pinos de flash SPI; supervisão analógica do reed em `ADC1` (GPIO 6 no ESP32-S3).
 
-- [x] Nenhuma carga (buzzer, LED) alimentada diretamente por GPIO. O LED consome 5,9 mA, e o buzzer passa pelo transistor.
-- [x] Diodo de roda livre previsto (D1) no buzzer.
-- [x] Nenhum sinal de 5 V ligado direto a um GPIO.
-- [x] Nenhum uso de GPIO 6 a 11. Nenhum atuador em pino de strapping.
-- [x] Sensor analógico no ADC1 (GPIO34).
+## Supervisão do reed (`REED_SUPERVISIONADO = 1`)
 
-## Supervisão do reed
+Para detectar fisicamente fio rompido (`falha_aberto`) ou curto-circuito (`falha_curto`) no sensor magnético MC-38 (Cenário 3 de [`docs/falhas/README.md`](../docs/falhas/README.md)), o firmware da Central suporta leitura analógica supervisionada no **GPIO 6 (`ADC1_CH5` no ESP32-S3)** com três resistores:
 
-Na v3, um fio solto no reed lê como "aberta", igual a uma abertura real. Para distinguir, o reed ganha dois resistores **junto ao sensor** e a leitura passa a ser analógica (GPIO34, ADC1 com atenuação de 11 dB):
+- `R1 = 10 kΩ` entre `GPIO 6` e `3V3` (junto à placa);
+- `Rs = 2,2 kΩ` em série com o paralelo `MC-38 || Reol (4,7 kΩ)` (junto ao sensor).
 
-- R1 = 10 kΩ no ESP32, ligando o GPIO34 ao 3V3.
-- Rs = 2,2 kΩ em série com o conjunto "reed em paralelo com Reol = 4,7 kΩ", na caixa do sensor.
-
-| Condição | Cálculo | Tensão no GPIO34 | Faixa de decisão |
+| Condição | Tensão esperada no GPIO 6 | Faixa no firmware (`config.h`) | Estado reportado |
 | :--- | :--- | :--- | :--- |
-| Porta fechada (reed fechado) | 3,3 V × 2,2 k / (10 k + 2,2 k) | ≈ 0,60 V | 0,15 a 1,00 V |
-| Porta aberta (reed aberto) | 3,3 V × (2,2 k + 4,7 k) / (10 k + 6,9 k) | ≈ 1,35 V | 1,00 a 2,30 V |
-| Fio rompido (circuito aberto) | Só o R1 puxa para 3V3 | ≈ 3,3 V | acima de 2,30 V |
-| Curto no cabo | O GPIO34 vai direto ao GND | ≈ 0 V | abaixo de 0,15 V |
+| Curto no cabo | ≈ 0,00 V | `< 150 mV` por 3 s | `modo = "seguro"`, `sensor = "falha_curto"` |
+| Porta fechada | ≈ 0,60 V | `150 a 1000 mV` | `sensor = "ok"`, `abertura = 0` |
+| Porta aberta | ≈ 1,35 V | `1000 a 2300 mV` | `sensor = "ok"`, `abertura = 1` |
+| Fio rompido / desconectado | ≈ 3,30 V | `> 2300 mV` por 3 s | `modo = "seguro"`, `sensor = "falha_aberto"` |
 
-Fio rompido ou curto por mais de 3 s coloca o firmware no modo SEGURO e gera o código de erro `E_SENSOR_FALHA`. As faixas são calculadas; a calibração no ADC real do ESP32 (que não é linear) é feita na Unidade 3. **Plano B**, se a supervisão não ficar confiável: voltar ao reed digital no GPIO4 e detectar falha por ausência de mudança de estado por um período configurável.
-
-## Em aberto
-
-- Segundo ESP32 ainda não adquirido (bloqueia o R13).
-- Confirmar o modelo exato do buzzer (piezoelétrico ou eletromagnético) e a corrente real no datasheet.
-- Itens "da v1" do [BOM](bom.md) a confirmar.
+Ao normalizar a leitura (religar o fio), o firmware retorna automaticamente para `sensor = "ok"` e `modo = "automatico"` **sem reiniciar**. Sem os três resistores instalados (`REED_SUPERVISIONADO = 0`), a Central opera no modo digital clássico no GPIO 15 (`INPUT_PULLUP` para `GND` real) e aceita `falha`/`curto`/`ok` pelo Monitor Serial para validação de bancada.
