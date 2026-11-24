@@ -46,6 +46,7 @@ button.primario:hover:not(:disabled) { background: #fff; border-color: #fff; }
 button.primario:disabled { background: #2a2a2a; border-color: #2a2a2a; color: var(--apagado); }
 button.perigo { color: var(--alerta); border-color: #5c3236; }
 button.perigo:hover:not(:disabled) { background: #2a1517; border-color: var(--alerta); }
+button.perigo:disabled { color: var(--apagado); border-color: var(--linha); }
 button.link { border: 0; padding: 0; background: none; color: var(--fraco); text-decoration: underline; text-underline-offset: 3px; }
 button.link:hover:not(:disabled) { background: none; color: var(--forte); }
 input, select {
@@ -131,6 +132,7 @@ figcaption { display: flex; justify-content: space-between; align-items: baselin
 .traco.cinza { background: #5a5a5a; }
 .traco.verde { background: var(--ok); }
 .grafico { position: relative; height: 210px; border: 1px solid var(--linha); border-radius: 8px; padding: 10px; }
+.grafico .sem-dados { position: absolute; inset: 0; display: grid; place-items: center; color: var(--fraco); font-size: 14px; }
 
 /* configurações */
 .configuracao { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: start; }

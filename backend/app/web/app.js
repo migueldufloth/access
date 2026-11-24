@@ -136,6 +136,7 @@ function grandezaPrincipal(d) {
 // Uma frase sobre o dispositivo, na ordem do que mais importa para quem olha.
 function situacao(d) {
   const e = d.estado;
+  if (!d.ultimo_contato) return ["Aguardando conexão", "apagado", "O dispositivo ainda não se conectou ao servidor."];
   if (!d.online) return ["Sem contato", "apagado", `Última comunicação ${ha(d.ultimo_contato)}.`];
   if (!e) return ["Aguardando dados", "apagado", "O dispositivo ainda não informou o estado."];
   if (e.alarme === "disparado") return ["Alarme disparado", "alerta", "A sirene está tocando."];
@@ -161,7 +162,7 @@ function blocoDispositivo(d) {
       el("div", {}, el("div", { class: "nome" }, d.nome), el("div", { class: "num fraco" }, d.device_id)),
       el("div", { class: "conexao" },
         el("div", { class: d.online ? "ok" : "apagado" }, d.online ? "Online" : "Offline"),
-        el("div", { class: "fraco", "data-ts": d.ultimo_contato || "" }, ha(d.ultimo_contato)))),
+        d.ultimo_contato && el("div", { class: "fraco", "data-ts": d.ultimo_contato }, ha(d.ultimo_contato)))),
     el("div", {}, el("div", { class: `situacao ${cor}` }, titulo), el("p", { class: "fraco" }, frase)),
     el("table", {}, el("tbody", {},
       linha(SENSOR[g].nome, leitura ? span(SENSOR[g].valores[leitura.valor], leitura.valor ? "aviso" : "") : nada()),
@@ -265,12 +266,18 @@ function tempoEntradaAtual() {
   if (document.activeElement === f.tempo) return;
   const d = dispositivos.find((x) => x.device_id === f.device.value);
   f.tempo.value = d?.estado?.config?.tempoEntrada_s ?? "";
+  f.tempo.placeholder = d?.estado ? "" : "o dispositivo ainda não informou";
 }
 $("#form-entrada").device.addEventListener("change", tempoEntradaAtual);
 
 // --- histórico --------------------------------------------------------------------
-function grafico(id, tipo, dados, eixoY = {}) {
+function grafico(id, tipo, dados, eixoY = {}, vazio = "") {
   graficos[id]?.destroy();
+  delete graficos[id];
+  const caixa = $(id).parentElement;
+  caixa.querySelector(".sem-dados")?.remove();
+  $(id).hidden = Boolean(vazio);
+  if (vazio) return caixa.append(el("div", { class: "sem-dados" }, vazio));
   const eixo = { ticks: { color: "#8a8a8a", font: { family: "ui-monospace, Menlo, Consolas, monospace", size: 11 } },
     grid: { color: "#1f1f1f" }, border: { color: "#333333" } };
   graficos[id] = new Chart($(id), {
@@ -307,7 +314,7 @@ async function historico() {
     $("#indicadores").replaceChildren(
       indicador(numero(total), SENSOR[g].eventos),
       indicador(duracao(a.tempo_em_alarme_s), "Com alarme disparado"),
-      indicador(`${numero(a.uptime_pct, 1)} %`, "Do tempo online"),
+      indicador(a.uptime_pct || dispositivos.find((d) => d.device_id === id)?.ultimo_contato ? `${numero(a.uptime_pct, 1)} %` : "—", "Do tempo online"),
       indicador(a.rssi.length ? `${numero(a.rssi.at(-1).media, 1)} dBm` : "—", "Sinal médio recente"));
 
     const porHora = a.eventos_por_hora.slice(-24);
@@ -315,14 +322,14 @@ async function historico() {
     grafico("#g-eventos", "bar", {
       labels: porHora.map((h) => `${String(new Date(h.hora).getHours()).padStart(2, "0")}h`),
       datasets: [{ label: SENSOR[g].eventos, data: porHora.map((h) => h.eventos), backgroundColor: "#5a5a5a", hoverBackgroundColor: "#d4d4d4", borderRadius: 2 }],
-    }, { beginAtZero: true, ticks: { precision: 0, color: "#8a8a8a" } });
+    }, { beginAtZero: true, ticks: { precision: 0, color: "#8a8a8a" } }, total ? "" : `Nenhuma ${SENSOR[g].nome === "Porta" ? "abertura" : "detecção"} no período.`);
     grafico("#g-rssi", "line", {
       labels: a.rssi.map((p) => new Date(p.ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })),
       datasets: [
         { label: "Leitura", data: a.rssi.map((p) => p.valor), borderColor: "#4a4a4a", borderWidth: 1, pointRadius: 0 },
         { label: "Média", data: a.rssi.map((p) => p.media), borderColor: "#7ec699", borderWidth: 1.75, pointRadius: 0 },
       ],
-    });
+    }, {}, a.rssi.length ? "" : "Sem leituras de sinal ainda.");
 
     const ultimas = mudancas(leituras).slice(0, 7);
     $("#tit-ultimos").textContent = `Últimas mudanças: ${SENSOR[g].nome.toLowerCase()}`;
