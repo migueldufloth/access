@@ -1,358 +1,168 @@
-# Projeto IoT - Access (Equipe 05 — Controle de Acesso)
+# Access — monitoramento de acessos com alarme e aviso no celular
+
+**Equipe 05 · Internet das Coisas 2026/2 · Família temática: Controle de Acesso**
+
+O Access avisa, em segundos, quando uma porta é aberta ou há movimento num ambiente protegido.
+Com o sistema armado, a sirene local toca mesmo sem internet; se ninguém reagir, o servidor manda
+um push para o celular e dispara as sirenes de todos os dispositivos do local. Tudo fica registrado:
+quem armou, quando a porta abriu, quanto tempo o alarme tocou.
+
+## Problema e usuário
+- **Problema:** sem monitoramento automatizado e em tempo real, a abertura de portas, janelas ou
+  compartimentos restritos passa despercebida, e intrusões são detectadas tarde.
+- **Usuário:** responsáveis por salas de servidores, almoxarifados, escritórios ou residências que
+  precisam ser avisados de uma intrusão e controlar o alarme à distância.
+  O **administrador** arma, desarma e configura; o **operador** acompanha o painel.
 
 ## Integrantes
-- Lucas Honorato dos Santos
-- Miguel Angel Balladares Huertas
-- Miguel Angelo Dufloth Filho
-- Gustavo Franz
-- Leonardo Lotério de Lima
-- Adrian Marcio Roth
-
-## Família Temática
-Tema da equipe: **Controle de Acesso**. A N1 e a N2/N3 são estágios de escopo crescente
-dentro desse mesmo tema, não temas diferentes:
-- **N1 (degrau mínimo viável):** Abertura e Presença — detecção de abertura de porta, alerta
-  local e notificação remota.
-- **N2/N3 (escopo completo):** Controle de Acesso — evolução do mesmo protótipo para o
-  controle de acesso completo.
-
-## Problema
-A ausência de monitoramento automatizado e em tempo real sobre a abertura de portas, janelas ou compartimentos restritos dificulta a detecção rápida de acessos não autorizados ou intrusões, aumentando o risco de segurança em ambientes residenciais ou corporativos.
-
-## Usuário ou Contexto de Uso
-**Contexto:** Ambientes que exigem monitoramento contínuo de acesso e presença, como salas de servidores/TI, escritórios, almoxarifados ou residências.
-**Usuário:** Administradores de segurança, gestores de TI ou proprietários que necessitam receber alertas instantâneos de intrusão/abertura de portas e controlar o estado de alarme remotamente.
-
-## Estado atual (herdado da N1)
-Protótipo com ESP32, sensor magnético MC-38, buzzer e display OLED que detecta a abertura de uma porta, publica telemetria por MQTT sobre `wss` (TLS) e aceita comando remoto com confirmação — mas ainda sem backend, banco de dados nem histórico, com uma única entrada física e um único dispositivo: o painel web fala direto com o broker e a regra de disparo roda no navegador.
-
-## Direção do upgrade (N2/N3)
-O upgrade mantém o mesmo problema e o mesmo usuário e acrescenta as camadas que faltam (proposta do CP12 — tecnologias de servidor ainda a confirmar):
-- **Dois dispositivos físicos** (porta e janela/ambiente), cada um com `deviceId`, e uma segunda entrada de tipo diferente (botão e PIR além do reed).
-- **Contrato MQTT versionado** (`CONTRATOS.md`): tópicos por dispositivo, JSON com versão, `deviceId`, timestamp e unidades, comando com `commandId` e confirmação com resultado.
-- **Backend (FastAPI) + PostgreSQL + Mosquitto** subindo com um único comando (Docker Compose): o backend valida e grava as mensagens, aplica as regras e é o único que publica comandos.
-- **Ciclo de comando com confirmação** em quatro estados (enviado, recebido, executado, confirmado) e rejeição com motivo.
-- **Decisão em duas camadas:** regra local no firmware (funciona sem rede) e regra remota/agendamento no backend.
-- **Interface web** com login, estado por dispositivo, histórico, alertas, painel analítico e envio de comando; **notificação externa** (Telegram).
-- **Firmware** com configuração persistente (NVS), estado seguro, OTA; **testes automatizados e CI** (pytest + GitHub Actions).
-
-Proposta completa (CP12, 27/10/2026), com conferência contra os requisitos R1–R18, arquitetura-alvo, hardware calculado, fluxograma do firmware, tecnologias, cronograma e riscos: [`docs/cp12/`](docs/cp12/). O contrato MQTT da N3 está congelado como v1 em [`CONTRATOS.md`](CONTRATOS.md) e o projeto de hardware em [`hardware/`](hardware/).
-
-## Objetivo da N1
-Desenvolver um protótipo com ESP32 capaz de detectar abertura de porta via sensor magnético e botão, operar em modos armado/desarmado, emitir um alerta/alarme local (buzzer, display e LED), publicar telemetria via MQTT com Wi-Fi e permitir o acionamento de comandos remotos de controle de estado com confirmação de ação.
-
-> **Nota:** o protótipo evoluiu da Versão 1 (sensor PIR HC-SR501, botão, buzzer e LED — efetivamente montada e testada) para o hardware atual, por duas razões. Primeiro, um integrante da equipe adquiriu um kit com ESP32, display OLED e sensor magnético de contato, tornando esses componentes disponíveis para o projeto. Segundo, o sensor magnético MC-38 responde diretamente ao evento do problema definido — abertura de porta —, enquanto o PIR captava presença no ambiente: dispararia com qualquer movimento na sala e ficaria em silêncio se a porta fosse aberta fora do seu campo de visão. O display OLED, por sua vez, permitiu um dashboard local que a Versão 1 não tinha.
-
-## Especificação de Hardware
-- **Microcontrolador:** Placa de desenvolvimento ESP32 Kit V1 ESP-WROOM-32, Dual-Core 240 MHz, Wi-Fi 802.11 b/g/n e Bluetooth BLE integrados.
-- **Sensores:**
-  - **Sensor de Abertura:** Sensor magnético de contato (reed switch) MC-38-NA.
-  - **Controle Manual para Ligar/Desligar Sistema:** Botão Pushbutton táctil 4 terminais 6x6x5 mm.
-- **Atuadores e Alertas:**
-  - **Alerta Sonoro:** Buzzer Piezoelétrico 5V (geração de frequências e tons sonoros de alarme via PWM, ~1.2kHz).
-  - **Alerta Visual:** LED Difuso Vermelho (indicação visual de status: aceso para Ativado/Desativado).
-  - **Display:** Display OLED I2C SSD1306 128x64 (dashboard local: estado da porta, contador de aberturas, tempo desde a última mudança e status da conexão Wi-Fi).
-- **Componentes Complementares e Proteção:**
-  - **Resistor Limitador:** Resistor de filme de carbono de 220 Ω em série com o terminal catodo do LED para controle de corrente.
-  - **Conexões e Prototipagem:** Mini Protoboard e conjunto de cabos jumpers (Macho-Macho / Macho-Fêmea).
-- **Alimentação:**
-  - Entrada primária de 5V DC via conector micro-USB (fonte externa/computador).
-- **Comunicação:** MQTT sobre WebSocket Secure (`wss://`, porta 443, TLS) em rede Wi-Fi padrão
-  2.4 GHz, via `esp_mqtt_client` do ESP-IDF. Publica telemetria, assina comando remoto e publica
-  confirmação de execução (ver [Arquitetura do Sistema e Comunicação MQTT](#arquitetura-do-sistema-e-comunicação-mqtt)).
-
-## Estrutura do Repositório
-- `/firmware` — firmwares dos microcontroladores (ver [firmware/README.md](firmware/README.md))
-  - `/firmware/firmware-central-s3` — **v2 (Placa 1 — ESP32-S3 Central da Porta):** MC-38, OLED SSD1306, I2S MAX98357, LED local, lógica combinada, `ntfy.sh` e MQTT sobre `wss://`
-  - `/firmware/firmware-satelite-esp32` — **v2 (Placa 2 — ESP32 Satélite de Movimento):** PIR HC-SR501 / Ultrassônico HC-SR04 + LED remoto sincronizado via MQTT sobre `wss://`
-  - `/firmware/Access` — firmware legado v1/N1 (placa única com buzzer)
-- `/hardware` — esquemas elétricos dos dois dispositivos da N3, mapa de pinos, BOM e verificação elétrica calculada (ver [hardware/README.md](hardware/README.md))
-- `CONTRATOS.md` — contrato MQTT v1 da N3 (tópicos, payloads, comandos, erros, QoS/retain)
-- `/docs` — documentação do projeto (entregas por aula)
-  - `/docs/cp12` — proposta de upgrade (CP12): PDFs entregues (parcial de 20/10 e completo de 27/10), fonte em Markdown e diagramas (`diagramas/*.svg`)
-- `/broker` — config do broker MQTT (Mosquitto), ACL v2, proxy nginx e dashboard web que atendem
-  `access/grupo5/#` em produção (ver [broker/README.md](broker/README.md))
-
-## Status Atual da Implementação
-
-| Elemento | Situação |
-| :--- | :--- |
-| Leitura do sensor magnético com detecção de borda | Implementado |
-| Conexão Wi-Fi com DHCP, log de IP e RSSI | Implementado |
-| Reconexão automática não bloqueante do Wi-Fi | Implementado e testado |
-| Sincronização de hora via SNTP antes do TLS | Implementado |
-| Conexão MQTT sobre WebSocket Secure (`wss://`), TLS, Last Will | Implementado |
-| Telemetria periódica e por evento em `sensor/presenca` | Implementado |
-| Comando remoto (`armar`/`desarmar`/`disparar`/`silenciar`) | Implementado |
-| Confirmação de comando em `status/confirmacao` | Implementado |
-| Alarme acionado pela decisão remota (`alarmeDisparado`), não mais pela leitura direta do sensor no `loop()` | Implementado |
-| Modo degradado (decide localmente sem contato com o broker por 30s) | Implementado |
-| Dashboard web (`broker/www/index.html`) sobre `mqtt.js`/`wss` | Implementado |
-| Notificação HTTP via `ntfy.sh` | Removida (substituída pelo fluxo MQTT acima) |
-| Leitura validada do sensor (debounce por tempo, `lerSensorValidado()`) | Implementado |
-| Reorganização do firmware em múltiplos arquivos (hoje é `Access.ino` + `config.h`) | A fazer |
-| Modo armado/desarmado por botão físico e LED de status | A fazer |
-| `docs/infraestrutura-broker.md` e `docs/broker-contingencia.md` dedicados | A fazer (ver [broker/README.md](broker/README.md) enquanto isso) |
-
-## Arquitetura do Sistema e Comunicação MQTT
-
-`MC-38 → ESP32 → Wi-Fi → wss/443 → nginx → Mosquitto → dashboard → comando → ESP32 → buzzer → confirmação`
-
-> **Conectividade:** o ESP32 não fica na mesma rede do broker, e o broker só expõe MQTT puro
-> (`1883`) para LAN/Tailscale — a internet só tem acesso à `443`. Por isso o firmware conecta via
-> **MQTT sobre WebSocket com TLS** (`wss://accessgrupo5.duckdns.org/mqtt`), usando o cliente
-> `esp_mqtt_client` do ESP-IDF em vez de `PubSubClient` puro. Detalhes em
-> [broker/README.md](broker/README.md#conectividade-externa-esp32-em-rede-diferente-do-broker).
-
-> **TLS:** a validação do certificado usa o bundle de CAs embutido no ESP-IDF
-> (`esp_crt_bundle_attach`), que já inclui a cadeia da Let's Encrypt. `firmware/Access/cert_isrg_root_x1.h`
-> (certificado ISRG Root X1 pinado) foi preparado como alternativa mais restrita, mas não está em
-> uso no firmware atual — fica como referência para quem quiser trocar a verificação por pinning.
-
-### 1. Fluxo de Telemetria (Dispositivo ➔ Nuvem)
-`[Sensor magnético MC-38]` ➔ `[ESP32]` ➔ `[Wi-Fi]` ➔ `[Broker MQTT via wss]` ➔ **Tópico:**
-`access/grupo5/sensor/presenca` ➔ `[Dashboard]`
-* **Quando publica:** a cada mudança de estado da porta e periodicamente a cada 5s.
-* **Payload (JSON):** `{"porta":"aberta","armado":true,"disparado":false,"aberturas":12,"rssi":-52}`
-
----
-
-### 2. Fluxo de Controle Remoto (Nuvem ➔ Dispositivo)
-`[Dashboard]` ➔ **Tópico:** `access/grupo5/comando/alarme` ➔ `[Broker MQTT]` ➔ `[ESP32 — MQTT_EVENT_DATA]` ➔ `[sistemaArmado / alarmeDisparado]` ➔ `[Buzzer]`
-* **Payloads aceitos:** `armar` \| `desarmar` \| `disparar` \| `silenciar`.
-* `disparar` só é aplicado com o sistema armado; caso contrário a confirmação vem com `aplicado:false` e o buzzer não soa.
-* O ESP32 confirma a execução publicando em `access/grupo5/status/confirmacao`:
-  `{"comando":"disparar","aplicado":true,"armado":true,"disparado":true}`
-
----
-
-### 3. Fluxo de Alerta Local (Modo Degradado)
-`[Sem contato com o broker por 30s]` ➔ `[avaliarModoDegradado()]` ➔ `[Lógica local: leitura direta do sensor]` ➔ `[Buzzer + OLED]`
-
-Fora dessa situação, o buzzer **não** reage à leitura direta do sensor — só a
-`alarmeDisparado`, que só o tratamento de comando MQTT escreve. Ver [Modo Degradado](#modo-degradado).
-
-### Contrato de Tópicos
-
-Prefixo `access/grupo5/`, definido como constantes em `firmware/Access/config.h` e replicado em
-`broker/www/index.html` e no ACL do broker (`broker/mosquitto/acl`).
-
-| Tópico | Direção | Payload |
+| Integrante | GitHub | Responsabilidade na N3 |
 | :--- | :--- | :--- |
-| `sensor/presenca` | ESP32 → broker | `{"porta":"aberta","armado":true,"disparado":false,"aberturas":12,"rssi":-52}` |
-| `comando/alarme` | dashboard → ESP32 | `armar` \| `desarmar` \| `disparar` \| `silenciar` |
-| `status/confirmacao` | ESP32 → broker | `{"comando":"disparar","aplicado":true,"armado":true,"disparado":true}` |
-| `status/presenca_dispositivo` | Last Will, ESP32 → broker | `online` \| `offline`, retido |
+| Lucas Honorato dos Santos | `honoratoog` | Hardware A e B; firmware de rede (Wi-Fi, SNTP, MQTT) |
+| Adrian Marcio Roth | `adrianrothh` | Montagem e medição em bancada; caixa de acabamento |
+| Gustavo Franz | `Gusgb4` | Máquina de estados, NVS, estado seguro e OTA no firmware |
+| Leonardo Lotério de Lima | `leonardosth` | Testes automatizados e CI; cenários de falha |
+| Miguel Angel Balladares Huertas | `miguettohuertas` | Backend: validação, persistência, API e ciclo de comando |
+| Miguel Angelo Dufloth Filho | `migueldufloth` | Compose e broker; interface, analítico, notificação e regra remota; release |
 
-## Modo Degradado
+## Arquitetura
 
-Sem laço de reconexão manual do broker — o cliente `esp_mqtt_client` já reconecta sozinho. O que
-o firmware acompanha é o **tempo sem contato**: cada evento de conexão e cada publicação (telemetria
-ou confirmação) atualiza `ultimoContatoBroker`.
+```text
+ Central da Porta (ESP32-S3)          Satélite de Movimento (ESP32)
+ porta-01: reed MC-38, sirene I2S     janela-01: PIR, LED de alerta
+        │   ╲________ ESP-NOW (alarme local, sem rede) ________╱   │
+        └──────────── MQTT (contrato v1, wss:// na 443) ───────────┘
+                                   │
+                   ┌──────── docker compose ────────┐
+                   │  mosquitto ── backend ── db    │  ──> ntfy.sh (push no celular)
+                   └───────────────┬────────────────┘
+                                   │ HTTPS (API + interface)
+                          Navegador: administrador / operador
+```
 
-- Sem contato por mais de `TIMEOUT_MODO_DEGRADADO` (30s), `avaliarModoDegradado()` liga o modo
-  degradado: o alarme volta a ser decidido pela leitura direta do sensor (`alarmeDisparado =
-  estadoAtual`), exatamente como na v2. O log serial registra a transição e a barra de status do
-  OLED mostra `[LOCAL]`.
-- Quando o broker volta a responder, a próxima leitura de `avaliarModoDegradado()` desliga o modo
-  degradado automaticamente e a decisão volta a vir do comando remoto.
-- É a única exceção à regra de que `alarmeDisparado` só é escrita pelo tratamento de comando MQTT.
+- **Dispositivos:** cada placa tem `deviceId` próprio e usuário MQTT próprio. A regra local (sirene
+  após o tempo de entrada) roda no firmware e funciona sem rede.
+- **Broker (Mosquitto):** autenticação obrigatória e ACL por dispositivo: cada placa só publica nos
+  próprios tópicos e só o backend publica comandos.
+- **Backend (FastAPI):** assina os tópicos, valida cada mensagem contra o
+  [`CONTRATOS.md`](CONTRATOS.md) (descarta e registra as inválidas), grava no PostgreSQL, aplica a
+  regra remota e os agendamentos, notifica no ntfy, expõe a API e serve a interface. É o único que
+  publica comandos.
+- **Banco (PostgreSQL):** histórico de medições, comandos com todas as fases, alertas, eventos de
+  online/offline, agendamentos e mensagens inválidas. Esquema versionado em
+  [`backend/db/migrations/`](backend/db/migrations/).
+- **Interface:** login, estado e último contato de cada dispositivo, alertas ativos, comandos com
+  progresso até a confirmação, histórico, painel analítico e configurações. Fala só com a API.
 
-Isso preserva a autonomia local do alarme sem transformá-la na arquitetura padrão: fora de uma
-falha real de rede, quem decide acionar o buzzer é o comando recebido via MQTT, não o `loop()`.
+Detalhes do backend em [`backend/README.md`](backend/README.md); contrato MQTT em
+[`CONTRATOS.md`](CONTRATOS.md); hardware em [`hardware/`](hardware/README.md); firmwares em
+[`firmware/`](firmware/README.md).
 
-## Protótipo do Circuito
+## Como executar
 
-### Versão 1 — concepção inicial
+### Pré-requisitos
+- Docker com Docker Compose v2.
+- Para gravar o firmware: Arduino IDE com o core ESP32 (ver [`firmware/README.md`](firmware/README.md)).
+- Opcional, para rodar testes e o simulador fora do Docker: Python 3.12.
 
-<img width="1138" height="501" alt="image" src="https://github.com/user-attachments/assets/2561c95c-0847-4903-b416-a3a165107052" />
+### 1. Configurar
+```bash
+git clone https://github.com/migueldufloth/access.git && cd access
+cp .env.example .env      # troque TODAS as senhas e o JWT_SECRET (openssl rand -hex 32)
+```
+`.env` fica fora do Git. Para receber os avisos no celular, instale o app **ntfy**, assine um
+tópico e coloque o nome dele em `NTFY_TOPICO`.
 
-Simulador: https://wokwi.com/projects/473279281421060097
+### 2. Subir broker, backend e banco (um comando)
+```bash
+docker compose up -d --build
+```
+Abra **http://localhost:8000** e entre com `ADMIN_USUARIO`/`ADMIN_SENHA` do `.env`. O operador
+(`OPERADOR_USUARIO`) vê o painel, mas não envia comandos.
 
-> **Este circuito foi efetivamente montado e testado:** o sensor PIR, o botão e o LED de
-> status funcionaram nessa montagem. O desenho e o link acima são o registro dessa concepção
-> inicial e não refletem a montagem atual.
-
-**Evolução para a Versão 2** (não uma correção — a Versão 1 funcionou como planejada):
-- Um integrante da equipe adquiriu um kit com ESP32, display OLED e sensor magnético de
-  contato (MC-38-NA), tornando esses componentes disponíveis para o projeto.
-- A equipe migrou para esse conjunto porque o MC-38 responde diretamente ao evento do
-  problema definido — abertura de porta —, enquanto o PIR captava presença no ambiente
-  (dispararia com qualquer movimento na sala e ficaria em silêncio se a porta fosse aberta
-  fora do seu campo de visão); e porque o display OLED permitiu um dashboard local que a
-  Versão 1 não tinha.
-- Buzzer remanejado para o GPIO 25, com o GPIO 18 mantido em `LOW` como terra virtual.
-- LED de status e botão de armar/desarmar ainda não foram reintegrados na Versão 2.
-
-### Versão 2 — hardware atual
-
-Pinagem atual documentada na seção [Instruções de Execução](#instruções-de-execução).
-
-> Diagrama a produzir — novo projeto no Wokwi ainda não criado para esta versão.
-
-### Versão 3 — MQTT sobre WSS (implementação atual)
-
-Mesmo hardware e pinagem da Versão 2 — a v3 não muda um fio, muda o firmware e adiciona
-infraestrutura de servidor:
-
-- Sai a notificação HTTP para o `ntfy.sh`; entra um cliente MQTT (`esp_mqtt_client`, ESP-IDF)
-  falando `wss://` com o broker.
-- A decisão de acionar o buzzer deixa de ser lida direto do sensor dentro do `loop()` e passa a
-  vir de um comando recebido pela rede (`alarmeDisparado`), com exceção do [modo
-  degradado](#modo-degradado).
-- Broker Mosquitto + proxy nginx provisionados e versionados em [`broker/`](broker/README.md), e
-  um [painel web](broker/www/index.html) substitui o acompanhamento só pelo Monitor Serial/OLED.
-
-## Instruções de Execução
-- **IDE:** Arduino IDE ou PlatformIO, com suporte à placa ESP32 (ESP-WROOM-32 / "ESP32 Dev Module").
-- **Bibliotecas:** `WiFi.h`, `Wire.h`, `Adafruit_GFX` e `Adafruit_SSD1306` (built-in/instaláveis
-  pelo core ESP32 de sempre). O cliente MQTT (`mqtt_client.h`/`esp_mqtt_client`) e a verificação
-  TLS (`esp_crt_bundle.h`/`esp_crt_bundle_attach`), ambos do ESP-IDF, também vêm no core
-  Arduino-ESP32 e não precisam de instalação — é o `esp_mqtt_client` que entra no lugar do
-  `PubSubClient`, porque o broker só é alcançável de fora via `wss://`, que `PubSubClient` não
-  suporta (ver [Arquitetura do Sistema e Comunicação MQTT](#arquitetura-do-sistema-e-comunicação-mqtt)).
-  É preciso instalar manualmente a `ArduinoJson` (Benoît Blanchon) pelo Gerenciador de
-  Bibliotecas da Arduino IDE.
-- **Pinagem (conforme `firmware/Access/Access.ino`):**
-  | Componente | Pino |
-  | :--- | :--- |
-  | Sensor magnético MC-38 | GPIO 4 (`INPUT_PULLUP`) |
-  | Buzzer (+) | GPIO 25 |
-  | Buzzer (terra virtual) | GPIO 18 (mantido em `LOW`) |
-  | Display OLED — SDA | GPIO 21 |
-  | Display OLED — SCL | GPIO 22 |
-  | LED de status | não implementado |
-  | Botão armar/desarmar | não implementado |
-- **Credenciais:** copie `firmware/Access/secrets.example.h` para `secrets.h` (mesma pasta) e
-  preencha `WIFI_SSID`, `WIFI_PASS`, `MQTT_URI` (`wss://accessgrupo5.duckdns.org/mqtt`),
-  `MQTT_USER` e `MQTT_PASS` com os valores reais. `secrets.h` está no `.gitignore` e não é
-  versionado.
-- **Sincronização de hora:** o firmware sincroniza a hora por SNTP logo após conectar o Wi-Fi e
-  **antes** de iniciar o cliente MQTT — a verificação do certificado TLS falha se o relógio ainda
-  estiver em 1970. Isso é automático (`sincronizarHora()`), não precisa de ação manual, mas é a
-  causa mais comum de erro de TLS se algo for alterado nessa ordem.
-- **Como rodar o firmware:** abrir `firmware/Access/Access.ino` na IDE, criar o `secrets.h`,
-  selecionar a placa "ESP32 Dev Module", gravar e abrir o Monitor Serial (115200 baud) para
-  acompanhar logs de leitura, Wi-Fi, hora e conexão MQTT.
-- **Como abrir a dashboard:** em produção já está publicada pelo nginx no mesmo domínio do
-  broker. Para rodar localmente, copie `broker/www/config.example.js` para `broker/www/config.js`
-  com o usuário/senha reais do `access_web` (esse `config.js` está no `.gitignore` e nunca deve
-  ser versionado) e abra `broker/www/index.html` no navegador.
-- **Validação da leitura:** `lerSensorValidado()` só aceita uma mudança de estado do MC-38 como real depois que o pino ficar estável por `DEBOUNCE_SENSOR_MS` (50 ms, ajustável em `config.h`) — debounce por tempo, não por contagem de amostras, filtrando bounce mecânico do reed switch e ruído elétrico antes de contar aberturas ou publicar telemetria.
-
-## Segurança
-
-- **Autenticação:** `allow_anonymous false` no broker — todo cliente precisa de usuário/senha
-  (`access_esp32` para o dispositivo, `access_web` para a dashboard).
-- **Autorização por ACL:** cada usuário só tem as permissões que o seu papel exige (ver
-  [broker/mosquitto/acl](broker/mosquitto/acl)). `access_esp32` escreve telemetria/status e lê
-  comando; `access_web` é o inverso — não consegue forjar telemetria, só publicar comando (o
-  mesmo que qualquer operador legítimo da dashboard já pode fazer).
-- **TLS:** toda conexão externa (ESP32 e dashboard) passa por `wss://` na porta 443, com
-  certificado Let's Encrypt terminado no nginx. MQTT puro (`1883`) só é alcançável em LAN/Tailscale,
-  nunca pela internet.
-- **Credenciais fora do repositório:** `secrets.h` (Wi-Fi e broker) e `broker/www/config.js`
-  (dashboard) estão no `.gitignore`; só os arquivos `*.example.*` correspondentes, sem valor
-  real, são versionados.
-- **Decisão consciente de escopo:** TLS mútuo (autenticação do dispositivo por certificado
-  próprio, não só usuário/senha) fica para N3 — o ganho de segurança adicional não se justifica
-  ainda no volume de dispositivos deste protótipo. Detalhes da infraestrutura em
-  [broker/README.md](broker/README.md).
-
-## Enquadramento IoT
-
-Como cada item do checklist do edital é atendido no código:
-
-| # | Item | Onde |
+| Serviço | Porta | Papel |
 | :--- | :--- | :--- |
-| 1 | Sensor físico real | Sensor magnético MC-38 (`REED_PIN`, `digitalRead`) |
-| 2 | Atuador físico real | Buzzer piezoelétrico (`BUZZER_POS`, `tone`/`noTone`) |
-| 3 | A leitura sai do dispositivo pela rede antes da decisão de atuação | O `loop()` aciona o buzzer a partir de `alarmeDisparado`, escrita só pelo comando MQTT — nunca pela leitura direta do sensor. Única exceção **declarada**: modo degradado, sem broker por 30s (ver [Modo Degradado](#modo-degradado)) |
-| 4 | Mensageria MQTT, com tópico publicado e assinado | Publica em `sensor/presenca` e `status/*`; assina `comando/alarme` (`iniciarMqtt`, `mqttEventHandler`) |
-| 5 | Comando remoto altera o estado do atuador | `tratarComando` altera `sistemaArmado`/`alarmeDisparado`; o buzzer físico responde a essa mudança no `loop()`, não a um clique local |
-| 6 | Confirmação da ação executada | `publicarConfirmacao` em `status/confirmacao`, com `aplicado:false` quando o comando é recusado (ex.: `disparar` desarmado) |
-| 7 | Telemetria ao longo do tempo | Publicação periódica a cada 5s (`INTERVALO_TELEMETRIA`) além da publicação por evento |
+| `backend` | 8000 | API REST (`/api/...`), interface e binários de OTA (`/firmware/<arquivo>.bin`) |
+| `mosquitto` | 1883 (LAN) · 9001 (só local, para o nginx) | Broker MQTT com ACL |
+| `db` | interna | PostgreSQL 16 com volume persistente |
 
-## Backlog
+### 3. Ligar os dispositivos
+Grave os firmwares seguindo [`firmware/README.md`](firmware/README.md), com o usuário MQTT igual ao
+`deviceId` (`porta-01`, `janela-01`) e a senha correspondente do `.env`.
 
-A coluna **Versão** identifica em qual hardware/software a tarefa foi feita ou será feita. Uma
-linha `v1` marcada como Feito descreve o circuito da concepção inicial, não uma funcionalidade
-presente no firmware atual. As linhas `v2` e `v3` juntas correspondem ao que está em
-`firmware/Access/Access.ino` hoje — a v3 não trocou hardware, só o transporte de rede e a lógica
-de decisão do alarme (ver [Protótipo do Circuito](#versão-3--mqtt-sobre-wss-implementação-atual)).
+Sem as placas em mãos, dá para simular um dispositivo que segue o mesmo contrato:
+```bash
+cd backend && pip install -r requirements.txt
+python -m tools.simulador porta-01 --senha <MQTT_SENHA_PORTA_01>   # digite: abrir, fechar, falha, ok
+```
 
-### Versão 1 (concluída)
+### 4. Verificar o sistema
+```bash
+cd backend
+pip install -r requirements-dev.txt
+docker run -d --rm --name access-pg-teste -p 55432:5432 -e POSTGRES_USER=access \
+  -e POSTGRES_PASSWORD=access -e POSTGRES_DB=access_test postgres:16-alpine
+python -m pytest                      # testes de contrato, regras, API e banco
+python -m tools.verificar_sistema     # ponta a ponta no compose, com dois dispositivos simulados
+```
+O CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) roda os dois a cada push e pull request.
 
-| Tarefa | Versão | Responsável | Prazo | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| Montar circuito com PIR, botão, buzzer e LED | v1 | Adrian Marcio Roth | — | Feito |
-| Ler PIR e estado do botão com debounce no Monitor Serial | v1 | Adrian Marcio Roth | — | Feito |
+### Produção (servidor da equipe)
+No servidor, o nginx do host termina o TLS de `accessgrupo5.duckdns.org` (Let's Encrypt) e repassa
+`/` para o backend e `/mqtt` para o WebSocket do Mosquitto. Assim, as placas conectam por
+`wss://accessgrupo5.duckdns.org/mqtt` de qualquer rede. Passos em [`broker/README.md`](broker/README.md).
 
-### Versão 2 (em andamento)
+## Requisitos da N3 (R1–R18)
 
-| Tarefa | Versão | Responsável | Prazo | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| Migrar para o kit com ESP32, OLED e sensor magnético | v2 | Lucas Honorato | — | Feito |
-| Ler o MC-38 com detecção de borda | v2 | Adrian Marcio Roth | — | Feito |
-| Buzzer com padrões distintos para abertura e fechamento | v2 | Lucas Honorato | — | Feito |
-| Dashboard local no OLED (estado, contador, tempo, status de rede) | v2 | Miguel Angelo Dufloth | — | Feito |
-| Wi-Fi com log de IP por DHCP e RSSI | v2 | Gustavo Franz | — | Feito |
-| Reconexão automática não bloqueante, verificação a cada 5s | v2 | Gustavo Franz | — | Feito |
-| Testar reconexão com queda provocada (evidência do CP06) | v2 | Lucas Honorato | — | Feito |
-| Reintegrar botão de armar/desarmar na v2 | v2 | Adrian Marcio Roth | 15/09 | A fazer |
-| Reintegrar LED vermelho de status na v2 | v2 | Adrian Marcio Roth | 15/09 | A fazer |
-| Cliente MQTT (`esp_mqtt_client` via `wss://`, não `PubSubClient`) e conexão ao broker | v2 | Gustavo Franz | 15/09 | Feito |
-| Publicar telemetria em `access/grupo5/sensor/presenca` | v2 | Miguel Angel Balladares | 15/09 | Feito |
-| Subscrever e tratar comandos em `access/grupo5/comando/alarme` | v2 | Leonardo Lotério | 15/09 | Feito |
-| Publicar confirmação em `access/grupo5/status/confirmacao` | v2 | Leonardo Lotério | 15/09 | Feito |
-| Mover a decisão de disparo do alarme para fora do `loop()`, passando pela mensageria | v2 | Gustavo Franz | 15/09 | Feito |
-| Reconexão do broker MQTT, separada da reconexão do Wi-Fi | v2 | Gustavo Franz | 15/09 | Feito (automática, embutida no `esp_mqtt_client`) |
-| Validar leitura do sensor antes de publicar | v2 | Miguel Angel Balladares | 15/09 | Feito |
-| Diagrama do circuito v2 e novo projeto no Wokwi | v2 | Adrian Marcio Roth | 15/09 | A fazer |
-| Documentação técnica do firmware (`firmware/README.md`) | v2 | Miguel Angelo Dufloth | 20/09 | A fazer |
-| Ensaio da demonstração e da validação individual | v2 | Todos | 20/09 | A fazer |
+Situação em 24/11/2026: **servidor pronto** (backend, banco, broker, interface, testes e CI,
+verificados ponta a ponta com dispositivos simulados). Os itens marcados com **(placas)** ainda
+dependem de gravar nas placas o firmware adaptado ao contrato v1. O guia está em
+[`docs/firmware-contrato-v1.md`](docs/firmware-contrato-v1.md).
 
-### Versão 3 (em andamento)
+| Req. | Como é atendido | Onde |
+| :--- | :--- | :--- |
+| R1 Hardware **(placas)** | 2 placas, 3 entradas (reed, PIR, ultrassônico), sirene I2S e LEDs | [`hardware/`](hardware/), [`firmware/`](firmware/) |
+| R2 Firmware **(placas)** | Regra local sem rede, reconexão, NVS, `deviceId`, `ts`, logs | [`firmware/`](firmware/); adaptação ao contrato v1 em [`docs/firmware-contrato-v1.md`](docs/firmware-contrato-v1.md) |
+| R3 Contrato | Contrato v1 congelado, validado pelo backend | [`CONTRATOS.md`](CONTRATOS.md), [`backend/app/contrato.py`](backend/app/contrato.py) |
+| R4 Backend | Assina, valida, descarta e registra inválidas, persiste, expõe API, único que comanda | [`backend/`](backend/README.md) |
+| R5 Banco | Medições, comandos (com as fases), alertas, status, agendamentos | [`backend/db/migrations/`](backend/db/migrations/) |
+| R6 Interface | Valor com unidade, histórico, último contato, online/offline, alertas, comandos | `backend/app/web/` |
+| R7 Comando | enviado → recebido → executado → confirmado; rejeição com motivo; `sem_resposta` em 10 s | [`backend/app/regras.py`](backend/app/regras.py) |
+| R8 Decisão remota | Escalonamento (porta armada aberta além do limite configurável) e agendamentos | [`backend/app/servico.py`](backend/app/servico.py) |
+| R9 Segurança | Login (bcrypt + JWT); só administrador comanda; segredos em `.env`/`secrets.h` | [`backend/app/auth.py`](backend/app/auth.py) |
+| R10 Falhas | 4 cenários executados com evidência | [`docs/falhas/`](docs/falhas/README.md) |
+| R11 Entrega | Este README; release identificada por tag | Releases do GitHub |
+| R12 Orquestração | `docker compose up` sobe broker, backend e banco | [`compose.yaml`](compose.yaml) |
+| R13 Escala **(placas)** | `porta-01` e `janela-01`, distinguidos no backend e na interface | — |
+| R14 Analítico | Eventos por hora, tempo em alarme, disponibilidade, média móvel do RSSI | `GET /api/analitico/{id}` |
+| R15 Notificação | Push no ntfy.sh para invasão, falha de sensor, offline armado e agendamento rejeitado | [`backend/app/notificacao.py`](backend/app/notificacao.py) |
+| R16 Segurança avançada | MQTT com TLS (`wss` na 443, Let's Encrypt validado) **e** perfis com permissões diferentes | [`broker/`](broker/README.md) |
+| R17 OTA **(placas)** | Comando `atualizar_firmware` (URL HTTPS + SHA-256) e binário servido pelo backend | [`docs/firmware-contrato-v1.md`](docs/firmware-contrato-v1.md) |
+| R18 Testes e CI | pytest (contrato, regras, API com banco) + verificação ponta a ponta no GitHub Actions | [`backend/tests/`](backend/tests/), [`.github/workflows/`](.github/workflows/ci.yml) |
 
-| Tarefa | Versão | Responsável | Prazo | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| Provisionar broker Mosquitto com autenticação e ACL | v3 | Miguel Angelo Dufloth Filho | — | Feito |
-| Publicar o broker por `wss` com TLS e proxy reverso nginx | v3 | Miguel Angelo Dufloth Filho | — | Feito |
-| Definir e aplicar o contrato de tópicos no ACL | v3 | Miguel Angelo Dufloth Filho | — | Feito |
-| Sincronizar hora via SNTP antes do TLS | v3 | Lucas Honorato | — | Feito |
-| Migrar o firmware de HTTP/`ntfy` para MQTT sobre `wss` | v3 | Lucas Honorato | — | Feito |
-| Modo degradado (decide localmente sem broker por 30s) | v3 | Gustavo Franz | — | Feito |
-| Remover `delay(30)` do fim do `loop()`, OLED com cadência própria | v3 | Gustavo Franz | — | Feito |
-| Painel web de telemetria (`broker/www/index.html`) sobre `mqtt.js`/`wss` | v3 | Miguel Angelo Dufloth Filho | — | Feito |
-| Reorganizar o firmware em múltiplos arquivos (rede/sensor/alarme/display) | v3 | — | 20/09 | A fazer |
-| `docs/infraestrutura-broker.md` e `docs/broker-contingencia.md` dedicados | v3 | Miguel Angelo Dufloth Filho | 20/09 | A fazer |
-| Atualizador de IP do DuckDNS no servidor | v3 | Miguel Angelo Dufloth Filho | 20/09 | A fazer |
-| Tag `v3` | v3 | Miguel Angelo Dufloth Filho | — | Feito (tag `v3` em `8831f6d`; o estado defendido na N1 é `50a9bd7`) |
+## Estrutura do repositório
+- `backend/` — serviço FastAPI, migrações do banco, interface web, testes e ferramentas
+  (`tools/simulador.py`, `tools/verificar_sistema.py`)
+- `broker/` — Mosquitto do compose (config, ACL do contrato v1, geração de senhas) e nginx do servidor
+- `firmware/` — firmwares da Central (ESP32-S3) e do Satélite (ESP32); `firmware/ota/` recebe os
+  binários servidos para o OTA; `firmware/Access/` é o firmware legado da N1
+- `hardware/` — esquemas elétricos, mapa de pinos, BOM e verificação elétrica
+- `docs/` — CP12, cenários de falha, guia do firmware e histórico da N1
+- `compose.yaml`, `.env.example`, `CONTRATOS.md`
 
-> [`docs/aprofundamento-aula04.md`](docs/aprofundamento-aula04.md) registra o planejamento e
-> os status da Versão 1 no momento da Aula 04 — é um registro histórico, não atualizado desde
-> então. [`docs/roteiro-mqtt-lucas.md`](docs/roteiro-mqtt-lucas.md) registra o roteiro passado
-> para a migração do firmware para MQTT. O backlog vigente do projeto é o desta seção.
-
-## Primeiro Risco Técnico
-- **Risco:** Perda de conexão Wi-Fi/Broker MQTT durante um evento de intrusão/abertura de porta, impedindo a notificação remota do alarme.
-- **Mitigação:** implementada. Reconexão automática do Wi-Fi (`verificarReconexaoWiFi`) e do
-  broker MQTT (embutida no `esp_mqtt_client`), e [modo degradado](#modo-degradado): sem contato
-  com o broker por 30s, o alarme volta a ser decidido localmente pelo sensor, sem depender da
-  rede para continuar funcionando.
+## Reaproveitamento declarado
+- **Bibliotecas:** FastAPI, Uvicorn, paho-mqtt, psycopg, PyJWT, bcrypt, httpx e pytest (via
+  `requirements*.txt`); **Chart.js 4.4.7** (licença MIT), copiado sem alteração em
+  `backend/app/web/vendor/`; imagens oficiais `postgres` e `eclipse-mosquitto`.
+- **Projeto Sala Inteligente:** usado como referência de arquitetura (backend como único
+  publicador de comandos, ciclo de confirmação). Modelo de dados, regras, contrato e interface
+  foram escritos para o problema do Access.
+- O código de exemplo do `esp_mqtt_client` e do ESP-NOW nos firmwares segue a documentação da
+  Espressif, adaptado aos tópicos e à lógica do projeto.
 
 ## Documentação
-
-- [`docs/cp12/`](docs/cp12/) — CP12: proposta de upgrade do projeto N1 para a N3. Parcial de 20/10/2026 (seções 1 a 4) e
-  versão completa de 27/10/2026 (seções 1 a 9 e anexos), com PDF, fonte em Markdown e diagramas (arquitetura-alvo, fluxos do dado
-  e do comando, fluxograma do firmware e esboço das telas).
-- [`CONTRATOS.md`](CONTRATOS.md) — contrato MQTT v1 da N3 (congelado em 27/10/2026).
-- [`hardware/`](hardware/README.md) — esquemas elétricos, mapa de pinos, BOM e verificação elétrica calculada (projeto, ainda não montado).
-- [`broker/README.md`](broker/README.md) — estrutura, deploy e teste do broker Mosquitto/nginx.
-- [`docs/roteiro-mqtt-lucas.md`](docs/roteiro-mqtt-lucas.md) — roteiro técnico usado para migrar
-  o firmware de HTTP para MQTT.
-- [`docs/aprofundamento-aula04.md`](docs/aprofundamento-aula04.md) — registro histórico da Aula 04
-  (Versão 1), não atualizado desde então.
-
-## Dúvidas para o Professor
-Nenhuma pendente no momento.
+- [`docs/falhas/`](docs/falhas/README.md) — os 4 cenários de falha do R10, com evidências.
+- [`docs/firmware-contrato-v1.md`](docs/firmware-contrato-v1.md) — o que o firmware precisa
+  publicar e tratar para seguir o contrato v1 (guia para a adaptação das placas).
+- [`docs/cp12/`](docs/cp12/) — proposta de upgrade (CP12), com arquitetura-alvo, hardware,
+  tecnologias, cronograma e riscos.
+- [`docs/historico-n1.md`](docs/historico-n1.md) — histórico da N1 (protótipo de placa única).

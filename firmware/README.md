@@ -1,5 +1,7 @@
 # Firmwares — Projeto Access (v2 Distribuído)
 
+> ⚠️ **Em adaptação para o contrato v1:** ver [`docs/firmware-contrato-v1.md`](../docs/firmware-contrato-v1.md).
+
 Esta pasta contém os firmwares da **v2 distribuída** (duas placas ESP32 comunicando-se via broker Mosquitto deste repositório) e mantém o firmware legado da v1/N1 como referência histórica.
 
 ## Estrutura
@@ -34,7 +36,10 @@ A comunicação foi dividida em duas camadas para máxima velocidade e confiabil
 | `access/grupo5/status/central` | Placa 1 (Central + LWT) | Dashboard | `"online"` \| `"offline"` | Sim |
 | `access/grupo5/status/satelite` | Placa 2 (Satélite + LWT) | Dashboard | `"online"` \| `"offline"` | Sim |
 
-> **Importante (servidor Mosquitto):** atualize `/etc/mosquitto/acl` com o arquivo [`broker/mosquitto/acl`](../broker/mosquitto/acl) deste repositório e reinicie o Mosquitto (`sudo systemctl restart mosquitto`), para que o usuário `access_esp32` tenha permissão `readwrite` em `sensor/#` e `status/#`.
+> **Contrato v1 (N3):** o servidor agora valida as mensagens contra o [`CONTRATOS.md`](../CONTRATOS.md)
+> e usa um usuário MQTT por dispositivo (`porta-01`, `janela-01`). Os tópicos acima são do formato
+> v2 anterior e são descartados pelo backend. O que muda em cada placa está em
+> [`docs/firmware-contrato-v1.md`](../docs/firmware-contrato-v1.md).
 
 ---
 

@@ -1,0 +1,36 @@
+ enviado  | device_id |   acao    | origem  |    estado    |      erro      |                 motivo                  
+----------+-----------+-----------+---------+--------------+----------------+-----------------------------------------
+ 01:11:29 | porta-01  | armar     | usuario | confirmado   |                | 
+ 01:11:29 | janela-01 | disparar  | usuario | rejeitado    | E_DESARMADO    | disparar exige o sistema armado
+ 01:11:36 | janela-01 | armar     | usuario | confirmado   |                | 
+ 01:11:47 | janela-01 | disparar  | regra   | confirmado   |                | 
+ 01:11:47 | porta-01  | disparar  | regra   | confirmado   |                | 
+ 01:11:54 | porta-01  | desarmar  | usuario | confirmado   |                | 
+ 01:11:56 | porta-01  | armar     | usuario | rejeitado    | E_SENSOR_FALHA | sensor em falha
+ 01:11:58 | porta-01  | silenciar | usuario | sem_resposta |                | não publicado: broker MQTT indisponível
+ 01:12:11 | porta-01  | silenciar | usuario | confirmado   |                | 
+(9 rows)
+
+              topico               |                                payload                                 |                    motivo                     
+-----------------------------------+------------------------------------------------------------------------+-----------------------------------------------
+ access/grupo5/porta-01/telemetria | {"v": 1, "deviceId": "porta-01", "ts": null, "uptime_s": 1, "medicoes" | E_VALOR_FORA_FAIXA: rssi = 50 fora de -120..0
+(1 row)
+
+ device_id |      tipo       |  aberto  | encerrado |                   detalhe                   
+-----------+-----------------+----------+-----------+---------------------------------------------
+ porta-01  | abertura_armado | 01:11:47 | 01:11:52  | aberta há mais de 10 s com o sistema armado
+ porta-01  | falha_sensor    | 01:11:54 | 01:11:56  | sensor em falha_aberto
+(2 rows)
+
+ device_id | status  |    ts    
+-----------+---------+----------
+ janela-01 | online  | 01:11:25
+ porta-01  | online  | 01:11:25
+ janela-01 | offline | 01:11:56
+ porta-01  | offline | 01:11:56
+ janela-01 | online  | 01:11:59
+ porta-01  | online  | 01:11:59
+ janela-01 | offline | 01:12:11
+ porta-01  | offline | 01:12:12
+(8 rows)
+

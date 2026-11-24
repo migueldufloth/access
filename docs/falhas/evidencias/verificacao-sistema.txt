@@ -1,0 +1,19 @@
+PASSOU R13: dois dispositivos online, cada um com deviceId
+PASSOU R9: comando sem autenticação é recusado (401)
+PASSOU R7: armar passa por enviado -> recebido -> executado -> confirmado
+PASSOU R7: comando proibido rejeitado com motivo (E_DESARMADO: disparar exige o sistema armado)
+PASSOU R16: a ACL impede um dispositivo de publicar no tópico de outro
+PASSOU R4: mensagem fora do contrato descartada e registrada (E_VALOR_FORA_FAIXA: rssi = 50 fora de -120..0)
+PASSOU R10.4: commandId repetido devolve a confirmação original com duplicado=true
+PASSOU R8: porta aberta e armada além do limite dispara as sirenes do local (ciclo completo)
+PASSOU R6/R15: alerta de invasão aberto (e notificado se NTFY_TOPICO definido)
+PASSOU R8: alerta encerrado quando a porta fecha
+PASSOU R10.3: falha de sensor vira alerta
+PASSOU R10.3: armar com sensor em falha é rejeitado (E_SENSOR_FALHA)
+PASSOU R10.2: comando com o broker fora vira sem_resposta (não publicado: broker MQTT indisponível)
+PASSOU R10.2: backend e dispositivos reconectam sozinhos e reassinam
+PASSOU R10.2: o comando da queda não foi reexecutado
+PASSOU R14: indicadores sobre o histórico real (alarme 7 s, disponibilidade 93.2%)
+PASSOU R10.1: dispositivo que cai sem aviso fica offline (Last Will)
+
+Tudo certo

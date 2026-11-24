@@ -1,0 +1,27 @@
+INFO:     Started server process [1]
+INFO:     Waiting for application startup.
+2026-11-24 04:11:20,392 INFO app.db: aplicando migração 001_inicial.sql
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-11-24 04:11:20,891 INFO app.mqtt: conectado ao broker mosquitto:1883; refazendo assinaturas
+2026-11-24 04:11:25,811 INFO app.servico: janela-01 ficou online
+2026-11-24 04:11:25,817 INFO app.servico: porta-01 ficou online
+2026-11-24 04:11:29,073 INFO app.servico: comando 7033ae0d-53e9-4095-90fa-af720d71f27f (armar) enviado a porta-01 por usuario
+2026-11-24 04:11:29,399 INFO app.servico: comando 7722d977-92a2-4b69-b26a-1f668fca97b7 (disparar) enviado a janela-01 por usuario
+2026-11-24 04:11:30,725 WARNING app.servico: mensagem inválida em access/grupo5/porta-01/telemetria: E_VALOR_FORA_FAIXA: rssi = 50 fora de -120..0
+2026-11-24 04:11:36,285 INFO app.servico: comando 8aca724b-febf-4a64-975d-bec2acceb0ad (armar) enviado a janela-01 por usuario
+2026-11-24 04:11:47,021 WARNING app.servico: alerta abertura_armado aberto em porta-01: aberta há mais de 10 s com o sistema armado
+2026-11-24 04:11:47,025 INFO app.servico: comando bc16d071-9b3e-42f5-935c-ca2fd465dcd6 (disparar) enviado a janela-01 por regra
+2026-11-24 04:11:47,029 INFO app.servico: comando 7801545b-8d4b-41ef-83ad-a62ab411428f (disparar) enviado a porta-01 por regra
+2026-11-24 04:11:54,170 INFO app.servico: comando 68c28a00-fd43-4d39-8a91-1c7a8cc4ee3b (desarmar) enviado a porta-01 por usuario
+2026-11-24 04:11:54,505 WARNING app.servico: alerta falha_sensor aberto em porta-01: sensor em falha_aberto
+2026-11-24 04:11:56,021 INFO app.servico: comando ce1740f1-50d5-4142-971f-fc12aa2b1d04 (armar) enviado a porta-01 por usuario
+2026-11-24 04:11:56,624 INFO app.servico: janela-01 ficou offline
+2026-11-24 04:11:56,627 INFO app.servico: porta-01 ficou offline
+2026-11-24 04:11:56,628 WARNING app.mqtt: desconectado do broker (Unspecified error); reconectando
+2026-11-24 04:11:59,653 INFO app.mqtt: conectado ao broker mosquitto:1883; refazendo assinaturas
+2026-11-24 04:11:59,702 INFO app.servico: janela-01 ficou online
+2026-11-24 04:11:59,711 INFO app.servico: porta-01 ficou online
+2026-11-24 04:12:11,036 INFO app.servico: comando a342e1c9-1942-4b56-9ae0-a27200ff4dc5 (silenciar) enviado a porta-01 por usuario
+2026-11-24 04:12:11,381 INFO app.servico: janela-01 ficou offline
+2026-11-24 04:12:12,418 INFO app.servico: porta-01 ficou offline
