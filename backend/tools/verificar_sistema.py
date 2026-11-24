@@ -97,6 +97,12 @@ def main() -> None:
         checar(cmd["erro"] == "E_DESARMADO", f"R7: comando proibido rejeitado com motivo ({cmd['erro']}: {cmd['motivo']})")
 
         # ACL (R16) e validação (R4): o dispositivo só publica nos próprios tópicos e mensagem inválida é registrada
+        def presencas_janela() -> int:
+            """Medições de presença = 1 da janela-01 (a mensagem forjada pela porta-01 seria uma delas)."""
+            medicoes = api.get(f"{API}/dispositivos/janela-01/medicoes?grandeza=presenca&limite=5000").json()
+            return sum(m["valor"] == 1 for m in medicoes)
+
+        antes = presencas_janela()
         intruso = cliente_mqtt("porta-01", SENHAS["porta-01"])
         intruso.publish("access/grupo5/janela-01/telemetria", json.dumps({"v": 1, "deviceId": "janela-01", "ts": None,
                         "uptime_s": 1, "medicoes": [{"grandeza": "presenca", "valor": 1, "unidade": "bool"}]}), qos=1)
@@ -105,8 +111,7 @@ def main() -> None:
         time.sleep(1.5)
         intruso.loop_stop()
         intruso.disconnect()
-        presencas = [m for m in api.get(f"{API}/dispositivos/janela-01/medicoes?grandeza=presenca").json() if m["valor"] == 1]
-        checar(not presencas, "R16: a ACL impede um dispositivo de publicar no tópico de outro")
+        checar(presencas_janela() == antes, "R16: a ACL impede um dispositivo de publicar no tópico de outro")
         invalida = api.get(f"{API}/mensagens-invalidas?limite=1").json()
         checar(bool(invalida) and invalida[0]["motivo"].startswith("E_VALOR_FORA_FAIXA"),
                f"R4: mensagem fora do contrato descartada e registrada ({invalida[0]['motivo'] if invalida else '-'})")
