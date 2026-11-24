@@ -42,9 +42,11 @@ class Servico:
             return self._invalida(topico, bruto, f"{e.codigo}: {e.motivo}", agora)
 
         ts = msg["_ts"] or agora   # ts null: vale a hora de recebimento (seção 1 do contrato)
+        if tipo == "status" and msg["status"] == "offline":
+            return self._mudar_status(device_id, False, agora)
+        self._tocar(device_id, agora, msg.get("fw") if tipo == "status" else None)
         if tipo == "status":
-            return self._mudar_status(device_id, msg["status"] == "online", agora, msg.get("fw"))
-        self._tocar(device_id, agora)
+            return
         if tipo == "telemetria":
             self._telemetria(device_id, msg, ts, agora)
         elif tipo == "estado":
@@ -58,25 +60,23 @@ class Servico:
                             "VALUES (%s, %s, %s, %s)",
                             (topico, bruto[:2048].decode("utf-8", "replace"), motivo, agora))
 
-    def _tocar(self, device_id: str, agora: datetime) -> None:
-        """Mensagem válida do dispositivo: registra o contato e o marca online se estava offline."""
+    def _tocar(self, device_id: str, agora: datetime, fw: str | None = None) -> None:
+        """Mensagem válida do dispositivo: registra o contato, marca online e encerra o alerta de offline
+        (que também abre por silêncio, sem o status ter mudado)."""
         self._mudar_status(device_id, True, agora)
-        self.banco.executar("UPDATE dispositivos SET ultimo_contato = %s WHERE device_id = %s", (agora, device_id))
+        self.banco.executar("UPDATE dispositivos SET ultimo_contato = %s, fw_versao = COALESCE(%s, fw_versao) "
+                            "WHERE device_id = %s", (agora, fw, device_id))
+        self.fechar_alerta(device_id, "dispositivo_offline", agora)
 
-    def _mudar_status(self, device_id: str, online: bool, agora: datetime, fw: str | None = None) -> None:
+    def _mudar_status(self, device_id: str, online: bool, agora: datetime) -> None:
+        """Atualiza online/offline e registra o evento só quando muda (base da disponibilidade)."""
         self.banco.executar("INSERT INTO dispositivos (device_id, nome) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                             (device_id, device_id))
-        mudou = self.banco.um(
-            "UPDATE dispositivos SET online = %s, fw_versao = COALESCE(%s, fw_versao), "
-            "ultimo_contato = CASE WHEN %s THEN %s ELSE ultimo_contato END "
-            "WHERE device_id = %s AND online IS DISTINCT FROM %s RETURNING device_id",
-            (online, fw, online, agora, device_id, online))
-        if mudou:
+        if self.banco.um("UPDATE dispositivos SET online = %s WHERE device_id = %s AND online IS DISTINCT FROM %s "
+                         "RETURNING device_id", (online, device_id, online)):
             self.banco.executar("INSERT INTO eventos_status (device_id, status, ts) VALUES (%s, %s, %s)",
                                 (device_id, "online" if online else "offline", agora))
             log.info("%s ficou %s", device_id, "online" if online else "offline")
-            if online:
-                self.fechar_alerta(device_id, "dispositivo_offline", agora)
 
     def _telemetria(self, device_id: str, msg: dict, ts: datetime, agora: datetime) -> None:
         with self.banco.pool.connection() as c:

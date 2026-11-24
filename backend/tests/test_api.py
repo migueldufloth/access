@@ -190,6 +190,15 @@ def test_offline_armado_gera_alerta(ambiente):
     assert servico.banco.um("SELECT count(*) AS n FROM alertas WHERE encerrado_em IS NULL")["n"] == 0
 
 
+def test_alerta_offline_por_silencio_fecha_quando_a_telemetria_volta(ambiente):
+    _, servico, *_ = ambiente
+    estado(servico, armado=True)                          # online, depois fica calado sem Last Will
+    servico.ciclo(T0 + timedelta(seconds=61))
+    assert servico.banco.um("SELECT count(*) AS n FROM alertas WHERE encerrado_em IS NULL")["n"] == 1
+    porta(servico, False, agora=T0 + timedelta(seconds=65))
+    assert servico.banco.um("SELECT count(*) AS n FROM alertas WHERE encerrado_em IS NULL")["n"] == 0
+
+
 def test_agendamento_gera_comando_e_rejeicao_vira_alerta(ambiente):
     cliente, servico, broker, ntfy = ambiente
     h = token(cliente)
