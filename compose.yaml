@@ -52,7 +52,7 @@ services:
     volumes:
       - ./firmware/ota:/firmware:ro   # binários do OTA (R17), servidos em /firmware/<arquivo>.bin
     ports:
-      - "8000:8000"              # interface e API: http://localhost:8000
+      - "127.0.0.1:8000:8000"    # interface e API: http://localhost:8000 (de fora, só pelo nginx com TLS)
 
 volumes:
   dados-db:

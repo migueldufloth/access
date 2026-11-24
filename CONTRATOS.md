@@ -2,7 +2,7 @@
 
 **Versão do contrato: 1** (congelado em 27/10/2026, CP12 completo). Qualquer mudança depois desta data gera nova versão (`v: 2`), registrada na [tabela de versões](#histórico-de-versões) no fim deste arquivo.
 
-Este contrato vale para o firmware da N3, para o backend (que valida cada mensagem contra ele) e para os testes automatizados. O firmware atual (v3, `access/grupo5/sensor/presenca` e afins) usa o contrato informal **v0**, descrito no [README](README.md#contrato-de-tópicos); ele deixa de valer quando o firmware da N3 for gravado.
+Este contrato vale para o firmware da N3, para o backend (que valida cada mensagem contra ele) e para os testes automatizados. O firmware atual (v3, `access/grupo5/sensor/presenca` e afins) usa o contrato informal **v0**, descrito no [README](docs/historico-n1.md#contrato-de-tópicos); ele deixa de valer quando o firmware da N3 for gravado.
 
 ## 1. Convenções
 

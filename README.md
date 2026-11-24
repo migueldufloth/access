@@ -111,6 +111,16 @@ No servidor, o nginx do host termina o TLS de `accessgrupo5.duckdns.org` (Let's 
 `/` para o backend e `/mqtt` para o WebSocket do Mosquitto. Assim, as placas conectam por
 `wss://accessgrupo5.duckdns.org/mqtt` de qualquer rede. Passos em [`broker/README.md`](broker/README.md).
 
+## Mudanças em relação ao CP12
+| No CP12 | Na implementação | Por quê |
+| :--- | :--- | :--- |
+| Notificação pelo Telegram | Push pelo **ntfy.sh** | Mesmo papel no R15, sem bot nem token para guardar; o canal já era usado pela equipe |
+| Perfil `proxy` (nginx) dentro do compose | nginx do próprio servidor, já com Let's Encrypt | O compose sobe completo sem domínio nem certificado; em produção o TLS fica onde já estava |
+| Dispositivos A (porta) e B (janela) com buzzer | Central ESP32-S3 (reed, sirene I2S, OLED) e Satélite ESP32 (PIR/ultrassônico), com ESP-NOW entre eles | Hardware v2 montado pela equipe; os `deviceId` (`porta-01`, `janela-01`) e o contrato v1 não mudaram |
+| Rotas da API na raiz | Rotas sob `/api` | A interface é servida na raiz pelo mesmo serviço |
+
+O contrato MQTT continua na v1 congelada: nenhuma mudança nos tópicos nem nos payloads.
+
 ## Requisitos da N3 (R1–R18)
 
 Situação em 24/11/2026: **servidor pronto** (backend, banco, broker, interface, testes e CI,

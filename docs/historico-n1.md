@@ -33,7 +33,7 @@ Desenvolver um protótipo com ESP32 capaz de detectar abertura de porta via sens
   - `/firmware/firmware-central-s3` — **v2 (Placa 1 — ESP32-S3 Central da Porta):** MC-38, OLED SSD1306, I2S MAX98357, LED local, lógica combinada, `ntfy.sh` e MQTT sobre `wss://`
   - `/firmware/firmware-satelite-esp32` — **v2 (Placa 2 — ESP32 Satélite de Movimento):** PIR HC-SR501 / Ultrassônico HC-SR04 + LED remoto sincronizado via MQTT sobre `wss://`
   - `/firmware/Access` — firmware legado v1/N1 (placa única com buzzer)
-- `/hardware` — esquemas elétricos dos dois dispositivos da N3, mapa de pinos, BOM e verificação elétrica calculada (ver [hardware/README.md](hardware/README.md))
+- `/hardware` — esquemas elétricos dos dois dispositivos da N3, mapa de pinos, BOM e verificação elétrica calculada (ver [hardware/README.md](../hardware/README.md))
 - `CONTRATOS.md` — contrato MQTT v1 da N3 (tópicos, payloads, comandos, erros, QoS/retain)
 - `/docs` — documentação do projeto (entregas por aula)
   - `/docs/cp12` — proposta de upgrade (CP12): PDFs entregues (parcial de 20/10 e completo de 27/10), fonte em Markdown e diagramas (`diagramas/*.svg`)
@@ -69,7 +69,7 @@ Desenvolver um protótipo com ESP32 capaz de detectar abertura de porta via sens
 > (`1883`) para LAN/Tailscale — a internet só tem acesso à `443`. Por isso o firmware conecta via
 > **MQTT sobre WebSocket com TLS** (`wss://accessgrupo5.duckdns.org/mqtt`), usando o cliente
 > `esp_mqtt_client` do ESP-IDF em vez de `PubSubClient` puro. Detalhes em
-> [broker/README.md](../broker/README.md#conectividade-externa-esp32-em-rede-diferente-do-broker).
+> [broker/README.md](../broker/README.md#conectividade-externa-placa-em-rede-diferente-do-servidor).
 
 > **TLS:** a validação do certificado usa o bundle de CAs embutido no ESP-IDF
 > (`esp_crt_bundle_attach`), que já inclui a cadeia da Let's Encrypt. `firmware/Access/cert_isrg_root_x1.h`
@@ -168,7 +168,7 @@ infraestrutura de servidor:
   vir de um comando recebido pela rede (`alarmeDisparado`), com exceção do [modo
   degradado](#modo-degradado).
 - Broker Mosquitto + proxy nginx provisionados e versionados em [`broker/`](../broker/README.md), e
-  um [painel web](../broker/www/index.html) substitui o acompanhamento só pelo Monitor Serial/OLED.
+  um painel web (removido na N3; ver o histórico do Git) substitui o acompanhamento só pelo Monitor Serial/OLED.
 
 ## Instruções de Execução
 - **IDE:** Arduino IDE ou PlatformIO, com suporte à placa ESP32 (ESP-WROOM-32 / "ESP32 Dev Module").
