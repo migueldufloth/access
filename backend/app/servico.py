@@ -102,6 +102,8 @@ class Servico:
             self.banco.executar("INSERT INTO medicoes (device_id, grandeza, valor, unidade, ts, recebido_em) "
                                 "VALUES (%s, 'alarme', %s, 'bool', %s, %s)",
                                 (device_id, int(msg["alarme"] == "disparado"), ts, agora))
+        if not msg["armado"]:   # desarmar resolve a invasão: o alerta do episódio se encerra
+            self.fechar_alerta(device_id, "abertura_armado", agora)
         if msg["sensor"].startswith("falha"):
             self.abrir_alerta(device_id, "falha_sensor", f"sensor em {msg['sensor']}", agora,
                               f"Falha de sensor em {device_id}", f"Sensor reportou {msg['sensor']}; modo {msg['modo']}.")

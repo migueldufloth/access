@@ -53,7 +53,7 @@ Confirmação repetida (`duplicado: true`) ou fora de ordem nunca faz o estado r
 - **Escalonamento:** dispositivo armado, porta aberta há mais de `limiteEscalonamento_s` e alarme
   ainda soando (não silenciado) → alerta `abertura_armado`, push no celular e comando `disparar`
   (origem `regra`) para todos os dispositivos armados e online do mesmo local. Um alerta por
-  episódio: só reabre depois que a porta fecha.
+  episódio: ele se encerra quando a porta fecha ou o sistema é desarmado.
 - **Offline armado:** dispositivo armado sem contato há mais de 60 s (Last Will ou 3 intervalos
   sem telemetria) → alerta `dispositivo_offline` e push.
 - **Falha de sensor:** `estado.sensor` em `falha_*` → alerta `falha_sensor` e push.

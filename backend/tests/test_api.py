@@ -157,6 +157,18 @@ def test_escalonamento_dispara_sirenes_do_local_e_notifica(ambiente):
     assert servico.banco.um("SELECT encerrado_em FROM alertas WHERE tipo = 'abertura_armado'")["encerrado_em"]
 
 
+def test_desarmar_encerra_o_alerta_de_invasao(ambiente):
+    _, servico, *_ = ambiente
+    estado(servico, alarme="disparado")
+    porta(servico, True)
+    servico.ciclo(T0 + timedelta(seconds=61))
+    assert servico.banco.um("SELECT count(*) AS n FROM alertas WHERE encerrado_em IS NULL "
+                            "AND tipo = 'abertura_armado'")["n"] == 1
+    estado(servico, armado=False, alarme="inativo")   # porta continua aberta
+    assert servico.banco.um("SELECT count(*) AS n FROM alertas WHERE encerrado_em IS NULL "
+                            "AND tipo = 'abertura_armado'")["n"] == 0
+
+
 def test_limite_configuravel_pela_interface(ambiente):
     cliente, servico, broker, _ = ambiente
     h = token(cliente)
