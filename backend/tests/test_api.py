@@ -284,7 +284,7 @@ def test_comando_falha_na_execucao_e_resposta_atrasada(ambiente):
     atrasado = servico.enviar_comando("porta-01", "silenciar", {}, 30, "usuario", agora=T0)
     servico.ciclo(T0 + timedelta(seconds=11))
     assert servico.comando(atrasado["command_id"])["estado"] == "sem_resposta"
-    confirmar(servico, atrasado["command_id"], "recebido", "aceito")
+    confirmar(servico, str(atrasado["command_id"]), "recebido", "aceito")
     assert servico.comando(atrasado["command_id"])["estado"] == "recebido"
 
 
