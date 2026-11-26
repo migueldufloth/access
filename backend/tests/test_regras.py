@@ -4,8 +4,14 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from app import analitico
-from app.regras import (Dispositivo, agendamento_vence, alvos_do_disparo, deve_alertar_offline, deve_escalonar,
-                        proximo_estado)
+from app.regras import (
+    Dispositivo,
+    agendamento_vence,
+    alvos_do_disparo,
+    deve_alertar_offline,
+    deve_escalonar,
+    proximo_estado,
+)
 
 AGORA = datetime(2026, 11, 24, 22, 0, tzinfo=timezone.utc)
 

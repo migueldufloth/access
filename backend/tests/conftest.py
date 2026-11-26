@@ -10,6 +10,7 @@ from app.config import Config
 from app.main import create_app
 
 URL = os.environ.get("TEST_DATABASE_URL", "postgresql://access:access@localhost:55432/access_test")
+_PG_INDISPONIVEL = False
 
 
 class BrokerFalso:
@@ -36,10 +37,14 @@ class NtfyFalso:
 
 @pytest.fixture
 def ambiente(tmp_path: Path):
+    global _PG_INDISPONIVEL
+    if _PG_INDISPONIVEL:
+        pytest.skip(f"PostgreSQL de teste indisponível em {URL}")
     try:
-        with psycopg.connect(URL, autocommit=True) as c:
+        with psycopg.connect(URL, autocommit=True, connect_timeout=2) as c:
             c.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public")
     except psycopg.OperationalError:
+        _PG_INDISPONIVEL = True
         pytest.skip(f"PostgreSQL de teste indisponível em {URL}")
     broker, ntfy = BrokerFalso(), NtfyFalso()
     cfg = Config(database_url=URL, jwt_secret="segredo-de-teste-com-32-caracteres!", admin_usuario="admin", admin_senha="admin123",

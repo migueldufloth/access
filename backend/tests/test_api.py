@@ -251,3 +251,85 @@ def test_firmware_publico_so_para_bin(ambiente):
     assert cliente.get("/firmware/access-1.0.1.bin").content == b"\x00binario"
     assert cliente.get("/firmware/..%2Fsegredo.bin").status_code == 404
     assert cliente.get("/firmware/nao-existe.bin").status_code == 404
+
+
+def test_saude_e_identidade_do_usuario(ambiente):
+    cliente, *_ = ambiente
+    assert cliente.get("/api/saude").json() == {"ok": True}
+    eu_admin = cliente.get("/api/eu", headers=token(cliente)).json()
+    assert (eu_admin["nome"], eu_admin["perfil"]) == ("admin", "administrador")
+    eu_oper = cliente.get("/api/eu", headers=token(cliente, "operador", "oper123")).json()
+    assert (eu_oper["nome"], eu_oper["perfil"]) == ("operador", "operador")
+
+
+def test_listagem_e_consulta_de_comandos(ambiente):
+    cliente, *_ = ambiente
+    h = token(cliente)
+    cmd_id = cliente.post("/api/comandos", json={"deviceId": "porta-01", "acao": "armar"}, headers=h).json()["command_id"]
+    lista = cliente.get("/api/comandos", headers=h).json()
+    assert len(lista) == 1 and lista[0]["command_id"] == cmd_id and lista[0]["nome_usuario"] == "admin"
+    assert cliente.get("/api/comandos/nao-e-uuid", headers=h).status_code == 404
+    assert cliente.get("/api/comandos/00000000-0000-0000-0000-000000000000", headers=h).status_code == 404
+
+
+def test_comando_falha_na_execucao_e_resposta_atrasada(ambiente):
+    cliente, servico, *_ = ambiente
+    h = token(cliente)
+    cmd_id = cliente.post("/api/comandos", json={"deviceId": "porta-01", "acao": "armar"}, headers=h).json()["command_id"]
+    confirmar(servico, cmd_id, "recebido", "aceito")
+    confirmar(servico, cmd_id, "executado", "falha", erro="E_INTERNO", motivo="falha na sirene")
+    cmd = cliente.get(f"/api/comandos/{cmd_id}", headers=h).json()
+    assert (cmd["estado"], cmd["erro"], cmd["motivo"]) == ("falha", "E_INTERNO", "falha na sirene")
+
+    atrasado = servico.enviar_comando("porta-01", "silenciar", {}, 30, "usuario", agora=T0)
+    servico.ciclo(T0 + timedelta(seconds=11))
+    assert servico.comando(atrasado["command_id"])["estado"] == "sem_resposta"
+    confirmar(servico, atrasado["command_id"], "recebido", "aceito")
+    assert servico.comando(atrasado["command_id"])["estado"] == "recebido"
+
+
+def test_crud_e_validacao_de_agendamentos(ambiente):
+    cliente, *_ = ambiente
+    h_admin = token(cliente)
+    h_oper = token(cliente, "operador", "oper123")
+
+    assert cliente.post("/api/agendamentos", json={"device_id": "porta-01", "acao": "armar", "hora": "22:00",
+                                                   "dias_semana": [1]}, headers=h_oper).status_code == 403
+    assert cliente.post("/api/agendamentos", json={"device_id": "porta-01", "acao": "armar", "hora": "22:00",
+                                                   "dias_semana": [7]}, headers=h_admin).status_code == 422
+    assert cliente.post("/api/agendamentos", json={"device_id": "nao-existe", "acao": "armar", "hora": "22:00",
+                                                   "dias_semana": [1]}, headers=h_admin).status_code == 404
+
+    criado = cliente.post("/api/agendamentos", json={"device_id": "porta-01", "acao": "armar", "hora": "22:00",
+                                                     "dias_semana": [5, 1, 5]}, headers=h_admin)
+    assert criado.status_code == 201 and criado.json()["dias_semana"] == [1, 5]
+    ag_id = criado.json()["id"]
+
+    assert len(cliente.get("/api/agendamentos", headers=h_oper).json()) == 1
+    assert cliente.delete(f"/api/agendamentos/{ag_id}", headers=h_oper).status_code == 403
+    assert cliente.delete(f"/api/agendamentos/{ag_id}", headers=h_admin).status_code == 204
+    assert cliente.delete(f"/api/agendamentos/{ag_id}", headers=h_admin).status_code == 404
+
+
+def test_alertas_ativos_e_filtros_de_medicoes(ambiente):
+    cliente, servico, *_ = ambiente
+    h = token(cliente)
+
+    estado(servico, sensor="falha_aberto", modo="seguro", agora=T0)
+    assert len(cliente.get("/api/alertas?ativos=true", headers=h).json()) == 1
+    estado(servico, sensor="ok", agora=T0 + timedelta(seconds=10))
+    assert cliente.get("/api/alertas?ativos=true", headers=h).json() == []
+    todos = cliente.get("/api/alertas?ativos=false", headers=h).json()
+    assert len(todos) == 1 and todos[0]["encerrado_em"] is not None
+
+    porta(servico, True, agora=T0)
+    porta(servico, False, agora=T0 + timedelta(minutes=5))
+    porta(servico, True, agora=T0 + timedelta(minutes=10))
+    de = (T0 + timedelta(minutes=1)).isoformat()
+    ate = (T0 + timedelta(minutes=9)).isoformat()
+    janela = cliente.get("/api/dispositivos/porta-01/medicoes",
+                         params={"grandeza": "abertura", "de": de, "ate": ate}, headers=h).json()
+    assert [m["valor"] for m in janela] == [0]
+    ultimas = cliente.get("/api/dispositivos/porta-01/medicoes",
+                          params={"grandeza": "abertura", "limite": 2}, headers=h).json()
+    assert [m["valor"] for m in ultimas] == [0, 1]

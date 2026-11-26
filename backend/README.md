@@ -66,14 +66,17 @@ derivada `alarme` (1 = disparado) a cada mudança do `estado`, base do indicador
 ## Testes
 ```bash
 pip install -r requirements-dev.txt
+ruff check app tests tools
 docker run -d --rm --name access-pg-teste -p 55432:5432 -e POSTGRES_USER=access \
   -e POSTGRES_PASSWORD=access -e POSTGRES_DB=access_test postgres:16-alpine
-python -m pytest -v
+python -m pytest -v --cov=app --cov-report=term-missing
 ```
 - `tests/test_contrato.py`: um caso por regra de descarte da seção 6 do contrato, e os comandos.
 - `tests/test_regras.py`: transições do comando, regras remotas, agendamento e indicadores.
+- `tests/test_auth.py`, `tests/test_config.py`, `tests/test_mqtt.py`, `tests/test_notificacao.py`:
+  testes unitários de autenticação/perfis, configuração, cliente MQTT e notificações ntfy (rodam sem banco).
 - `tests/test_api.py`: integração com PostgreSQL real (autenticação e perfis, ingestão, ciclo de
-  comando, sem resposta, broker fora, escalonamento, falha de sensor, offline, agendamento,
-  analítico, OTA).
+  comando, falha de execução, resposta atrasada, sem resposta, broker fora, escalonamento, falha
+  de sensor, offline, CRUD e disparo de agendamentos, filtros de medições, analítico, OTA).
 
 Banco de teste em outro endereço: `TEST_DATABASE_URL=postgresql://...`.
